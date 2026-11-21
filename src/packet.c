@@ -68,7 +68,7 @@ static unsigned char *packet_encrypt(ssh_session session, void *data,
         return NULL;
     }
 
-    seq = ntohl(session->send_seq);
+    seq = htonl(session->send_seq);
     cipher = crypto->out_cipher;
 
     ctx = hmac_init(crypto->encryptMAC, hmac_digest_len(type), type);
@@ -105,10 +105,6 @@ static int packet_decrypt(ssh_session session, uint8_t *destination,
                           size_t encrypted_size) {
     struct ssh_crypto_struct *crypto = NULL;
     struct ssh_cipher_struct *cipher = NULL;
-
-    if (encrypted_size < 0) {
-        return SSH_ERROR;
-    }
 
     crypto = ssh_get_crypto(session, SSH_DIRECTION_IN);
     if (crypto == NULL) {
@@ -197,7 +193,7 @@ static int packet_hmac_verify(ssh_session session, const void *data, size_t len,
     // ssh_log_hexdump("Computed mac", hmacbuf, hmaclen);
     // ssh_log_hexdump("seq", (unsigned char *)&seq, sizeof(uint32_t));
 
-    if (memcmp(mac, hmacbuf, hmaclen) == 0) {
+    if (CRYPTO_memcmp(mac, hmacbuf, hmaclen) == 0) {
         return SSH_OK;
     }
 
@@ -219,15 +215,10 @@ int ssh_packet_receive(ssh_session session) {
     uint8_t *ptr = NULL;
     int to_be_read;
     int rc;
-    uint8_t *cleartext_packet = NULL;
-    uint8_t *packet_second_block = NULL;
     uint8_t *mac = NULL;
-    size_t packet_remaining;
     uint32_t packet_len;
     uint8_t padding;
-    size_t processed = 0; /* number of byte processed from the callback */
     struct ssh_crypto_struct *crypto = NULL;
-    bool ok;
 
     crypto = ssh_get_crypto(session, SSH_DIRECTION_IN);
     if (crypto != NULL) {
@@ -241,8 +232,10 @@ int ssh_packet_receive(ssh_session session) {
     }
 
     data = calloc(lenfield_blocksize, sizeof(uint8_t));
+    if (data == NULL) goto error;
 
-    ssh_socket_read(session->socket, data, lenfield_blocksize);
+    rc = ssh_socket_read(session->socket, data, lenfield_blocksize);
+    if (rc != SSH_OK) goto error;
 
     if (session->in_buffer) {
         rc = ssh_buffer_reinit(session->in_buffer);
@@ -261,11 +254,22 @@ int ssh_packet_receive(ssh_session session) {
         goto error;
     }
     packet_len = packet_decrypt_len(session, ptr, data);
+    if (packet_len < 5 ||
+        packet_len > 35000 - sizeof(uint32_t) - current_macsize ||
+        (packet_len + sizeof(uint32_t)) % blocksize != 0) {
+        ssh_set_error(SSH_FATAL, "invalid packet length: %u", packet_len);
+        goto error;
+    }
     to_be_read =
         packet_len - lenfield_blocksize + sizeof(uint32_t) + current_macsize;
 
-    data = realloc(data, to_be_read * sizeof(uint8_t) + 1);
-    ssh_socket_read(session->socket, data, to_be_read);
+    {
+        uint8_t *resized = realloc(data, (size_t)to_be_read + 1);
+        if (resized == NULL) goto error;
+        data = resized;
+    }
+    rc = ssh_socket_read(session->socket, data, to_be_read);
+    if (rc != SSH_OK) goto error;
 
     ptr = ssh_buffer_allocate(session->in_buffer, to_be_read - current_macsize);
     if (ptr == NULL) goto error;
@@ -279,7 +283,9 @@ int ssh_packet_receive(ssh_session session) {
             goto error;
         }
         /* verify MAC, see `packet_hmac_verify` */
-        // LAB: insert your code here.
+        rc = packet_hmac_verify(session, ssh_buffer_get(session->in_buffer),
+                                ssh_buffer_get_len(session->in_buffer), mac,
+                                crypto->in_hmac);
 
         if (rc != SSH_OK) {
             ssh_set_error(SSH_FATAL, "hmac error");
@@ -298,12 +304,12 @@ int ssh_packet_receive(ssh_session session) {
     ssh_buffer_pass_bytes(session->in_buffer, sizeof(uint32_t));
 
     rc = ssh_buffer_get_u8(session->in_buffer, &padding);
+    if (rc != 1) goto error;
 
     /* There MUST be at least four bytes of padding.  The
      padding SHOULD consist of random bytes.  The maximum amount of
      padding is 255 bytes. */
-    if (padding < 4 || padding > 255 ||
-        padding > ssh_buffer_get_len(session->in_buffer)) {
+    if (padding < 4 || padding >= ssh_buffer_get_len(session->in_buffer)) {
         ssh_set_error(SSH_FATAL, "Invalid padding: %d (%d left)", padding,
                       ssh_buffer_get_len(session->in_buffer));
         goto error;
@@ -365,20 +371,25 @@ int ssh_packet_send(ssh_session session) {
         (blocksize -
          ((blocksize - lenfield_blocksize + payload_size + 5) % blocksize));
     if (padding_size < 4) {
-        /* why? */
         padding_size += blocksize;
     }
+    if (padding_size > sizeof(padding_data)) return SSH_ERROR;
 
-    if (crypto != NULL) {
-        if (!ssh_get_random(padding_data, padding_size, 0)) {
-            ssh_set_error(SSH_FATAL, "PRNG error");
-            return SSH_ERROR;
-        }
+    if (!ssh_get_random(padding_data, padding_size, 0)) {
+        ssh_set_error(SSH_FATAL, "PRNG error");
+        return SSH_ERROR;
     }
 
     finallen = payload_size + padding_size + 1;
+    if ((size_t)finallen + sizeof(uint32_t) + hmac_digest_len(hmac_type) >
+        35000) {
+        return SSH_ERROR;
+    }
 
-    *((uint32_t *)&header[0]) = htonl(finallen);
+    {
+        uint32_t packet_len = htonl(finallen);
+        memcpy(header, &packet_len, sizeof(packet_len));
+    }
     header[4] = padding_size;
 
     rc = ssh_buffer_prepend_data(session->out_buffer, header, sizeof(header));
@@ -388,6 +399,7 @@ int ssh_packet_send(ssh_session session) {
 
     hmac = packet_encrypt(session, ssh_buffer_get(session->out_buffer),
                           ssh_buffer_get_len(session->out_buffer));
+    if (crypto != NULL && hmac == NULL) return SSH_ERROR;
     if (hmac != NULL) {
         rc = ssh_buffer_add_data(session->out_buffer, hmac,
                                  hmac_digest_len(hmac_type));
@@ -396,7 +408,7 @@ int ssh_packet_send(ssh_session session) {
 
     rc = ssh_socket_write(session->socket, ssh_buffer_get(session->out_buffer),
                           ssh_buffer_get_len(session->out_buffer));
-    if (rc < 0) return SSH_ERROR;
+    if (rc != (int)ssh_buffer_get_len(session->out_buffer)) return SSH_ERROR;
 
     session->send_seq++;
 
