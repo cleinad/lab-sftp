@@ -1,0 +1,8 @@
+# CP2: negotiated cipher suite
+Client log:
+10:16:58:109556     [INFO] ssh_select_kex (kex.c:285) - negotiated algorithms: KEX=diffie-hellman-group1-sha1 host-key=ssh-rsa; client->server cipher=aes256-cbc MAC=hmac-sha1 compression=none; server->client cipher=aes256-cbc MAC=hmac-sha1 compression=none
+
+Server log:
+debug1: kex: algorithm: diffie-hellman-group1-sha1 [preauth]
+debug1: kex: client->server cipher: aes256-cbc MAC: hmac-sha1 compression: none [preauth]
+debug1: kex: server->client cipher: aes256-cbc MAC: hmac-sha1 compression: none [preauth]

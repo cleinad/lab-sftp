@@ -49,7 +49,7 @@ else
   cd $W
 fi
 sleep 1; kill $TD 2>/dev/null; wait $TD 2>/dev/null
-cmp -s $O/sent.bin $W/dl/$N && echo DOWNLOAD_MATCH > $O/download.txt || echo DOWNLOAD_MISMATCH > $O/download.txt
+cp $W/dl/$N $O/downloaded.bin 2>/dev/null; cmp -s $O/sent.bin $W/dl/$N && echo DOWNLOAD_MATCH > $O/download.txt || echo DOWNLOAD_MISMATCH > $O/download.txt
 chmod -R a+rw $O
 '
 docker logs "$SRV" > "$OUT/sshd.log" 2>&1

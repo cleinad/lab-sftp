@@ -1,0 +1,24 @@
+# CP6: upload and download client.c
+Client transcript:
+client.c uploaded to the remote home directory
+exit=0
+client.c downloaded to the current working direcrtory
+exit=0
+
+SHA-256 (local original, server copy, downloaded copy):
+eb6cdf34ccacc744fc549e610cb7c75df340aa938c2c79ad8abd4ffc01b57428  /r/client.c
+eb6cdf34ccacc744fc549e610cb7c75df340aa938c2c79ad8abd4ffc01b57428  /o/remote.bin
+eb6cdf34ccacc744fc549e610cb7c75df340aa938c2c79ad8abd4ffc01b57428  /o/downloaded.bin
+
+Harness result:
+CP1  PASS  version exchange; client shows server id
+CP2  PASS  kex negotiated
+CP2b PASS  aes256-cbc + hmac-sha1 both ways
+CP3  PASS  keys switched
+CP3b PASS  no plaintext after NEWKEYS in pcap
+CP4  PASS  password auth
+CP5  PASS  session channel + sftp subsystem
+CP6a PASS  upload matches
+CP6b PASS  download matches
+logs: /Users/danielchen/Documents/code/projects/lab-sftp/harness/out
+ALL_PASS
