@@ -40,6 +40,113 @@
  */
 static uint32_t channel_new_id(ssh_session session) { return 1; }
 
+static int channel_add_remote_window(ssh_channel channel,
+                                     uint32_t bytes_to_add) {
+    if (UINT32_MAX - channel->remote_window < bytes_to_add) {
+        LOG_ERROR("remote channel window overflow");
+        return SSH_ERROR;
+    }
+
+    channel->remote_window += bytes_to_add;
+    LOG_NOTICE("remote window adjust to %u", channel->remote_window);
+    return SSH_OK;
+}
+
+static int channel_handle_global_request(ssh_session session) {
+    char *request = NULL;
+    uint8_t want_reply;
+    int rc;
+
+    rc = ssh_buffer_unpack(session->in_buffer, "sb", &request, &want_reply);
+    if (rc != SSH_OK) {
+        SAFE_FREE(request);
+        return SSH_ERROR;
+    }
+
+    LOG_NOTICE("rejecting global request %s", request);
+    SAFE_FREE(request);
+
+    if (!want_reply) return SSH_OK;
+
+    rc = ssh_buffer_pack(session->out_buffer, "b", SSH_MSG_REQUEST_FAILURE);
+    if (rc != SSH_OK || ssh_packet_send(session) != SSH_OK) {
+        ssh_buffer_reinit(session->out_buffer);
+        return SSH_ERROR;
+    }
+
+    return SSH_OK;
+}
+
+static int channel_reject_open(ssh_session session) {
+    char *type = NULL;
+    uint32_t sender_channel;
+    int rc;
+
+    rc = ssh_buffer_unpack(session->in_buffer, "sd", &type, &sender_channel);
+    if (rc != SSH_OK) {
+        SAFE_FREE(type);
+        return SSH_ERROR;
+    }
+
+    LOG_NOTICE("rejecting server channel open of type %s", type);
+    SAFE_FREE(type);
+
+    rc = ssh_buffer_pack(session->out_buffer, "bddss",
+                         SSH_MSG_CHANNEL_OPEN_FAILURE, sender_channel,
+                         SSH_OPEN_ADMINISTRATIVELY_PROHIBITED,
+                         "server-initiated channels are not supported", "");
+    if (rc != SSH_OK || ssh_packet_send(session) != SSH_OK) {
+        ssh_buffer_reinit(session->out_buffer);
+        return SSH_ERROR;
+    }
+
+    return SSH_OK;
+}
+
+static int channel_reject_request(ssh_channel channel) {
+    ssh_session session = channel->session;
+    char *request = NULL;
+    uint8_t want_reply;
+    int rc;
+
+    rc = ssh_buffer_unpack(session->in_buffer, "sb", &request, &want_reply);
+    if (rc != SSH_OK) {
+        SAFE_FREE(request);
+        return SSH_ERROR;
+    }
+
+    LOG_NOTICE("ignoring channel request %s", request);
+    SAFE_FREE(request);
+
+    if (!want_reply) return SSH_OK;
+
+    rc = ssh_buffer_pack(session->out_buffer, "bd", SSH_MSG_CHANNEL_FAILURE,
+                         channel->remote_channel);
+    if (rc != SSH_OK || ssh_packet_send(session) != SSH_OK) {
+        ssh_buffer_reinit(session->out_buffer);
+        return SSH_ERROR;
+    }
+
+    return SSH_OK;
+}
+
+static int channel_send_close(ssh_channel channel) {
+    ssh_session session = channel->session;
+    int rc;
+
+    if (channel->local_eof == 2) return SSH_OK;
+
+    rc = ssh_buffer_pack(session->out_buffer, "bd", SSH_MSG_CHANNEL_CLOSE,
+                         channel->remote_channel);
+    if (rc != SSH_OK || ssh_packet_send(session) != SSH_OK) {
+        ssh_buffer_reinit(session->out_buffer);
+        return SSH_ERROR;
+    }
+
+    channel->local_eof = 2;
+    return SSH_OK;
+}
+
 /**
  * @brief Open a channel by sending a SSH_CHANNEL_OPEN message and
  *        wait for the reply.
@@ -65,8 +172,7 @@ static int channel_open(ssh_channel channel, const char *type, uint32_t window,
     uint32_t recipient_channel;
     uint32_t reason_code;
     char *description = NULL;
-    ssh_string req;
-    bool want;
+    char *language = NULL;
     int rc;
 
     channel->local_channel = channel_new_id(session);
@@ -97,12 +203,42 @@ static int channel_open(ssh_channel channel, const char *type, uint32_t window,
         if (rc != SSH_OK) return SSH_ERROR;
 
         rc = ssh_buffer_get_u8(session->in_buffer, &reply_type);
+        if (rc == 0) return SSH_ERROR;
         switch (reply_type) {
             case SSH_MSG_CHANNEL_OPEN_CONFIRMATION:
-                // LAB: insert your code here.
+                rc = ssh_buffer_unpack(
+                    session->in_buffer, "dddd", &recipient_channel,
+                    &channel->remote_channel, &channel->remote_window,
+                    &channel->remote_maxpacket);
+                if (rc != SSH_OK ||
+                    recipient_channel != channel->local_channel ||
+                    channel->remote_maxpacket == 0) {
+                    LOG_ERROR("invalid channel open confirmation");
+                    return SSH_ERROR;
+                }
+
+                LOG_INFO("local channel id %u, window %u",
+                         channel->local_channel, channel->local_window);
+                LOG_INFO("remote channel id %u, window %u",
+                         channel->remote_channel, channel->remote_window);
+                return SSH_OK;
 
             case SSH_MSG_CHANNEL_OPEN_FAILURE:
-                // LAB: insert your code here.
+                rc = ssh_buffer_unpack(session->in_buffer, "ddss",
+                                       &recipient_channel, &reason_code,
+                                       &description, &language);
+                if (rc == SSH_OK &&
+                    recipient_channel == channel->local_channel) {
+                    ssh_set_error(SSH_REQUEST_DENIED,
+                                  "channel open failed (%u): %s", reason_code,
+                                  description);
+                } else {
+                    ssh_set_error(SSH_FATAL,
+                                  "invalid channel open failure response");
+                }
+                SAFE_FREE(description);
+                SAFE_FREE(language);
+                return SSH_ERROR;
 
             case SSH_MSG_GLOBAL_REQUEST:
                 /**
@@ -122,15 +258,19 @@ static int channel_open(ssh_channel channel, const char *type, uint32_t window,
                  * naming convention outlined in [SSH-ARCH].
                  *
                  */
-                // LAB: insert your code here.
+                if (channel_handle_global_request(session) != SSH_OK)
+                    return SSH_ERROR;
+                break;
+
+            case SSH_MSG_CHANNEL_OPEN:
+                if (channel_reject_open(session) != SSH_OK) return SSH_ERROR;
+                break;
 
             default:
-                // LAB: insert your code here.
-
+                LOG_ERROR("received type %u during channel open", reply_type);
+                return SSH_ERROR;
         }
     }
-
-    return SSH_OK;
 }
 
 /**
@@ -176,8 +316,21 @@ static int channel_request(ssh_channel channel, const char *request, int reply,
             return SSH_ERROR;
         }
 
-        rc = ssh_buffer_unpack(session->in_buffer, "bd", &type,
-                               &recipient_channel);
+        rc = ssh_buffer_get_u8(session->in_buffer, &type);
+        if (rc == 0) return SSH_ERROR;
+
+        if (type == SSH_MSG_GLOBAL_REQUEST) {
+            if (channel_handle_global_request(session) != SSH_OK)
+                return SSH_ERROR;
+            continue;
+        }
+        if (type == SSH_MSG_CHANNEL_OPEN) {
+            if (channel_reject_open(session) != SSH_OK) return SSH_ERROR;
+            continue;
+        }
+
+        rc = ssh_buffer_unpack(session->in_buffer, "d", &recipient_channel);
+        if (rc != SSH_OK) return SSH_ERROR;
         if (recipient_channel != channel->local_channel) {
             LOG_ERROR(
                 "channel number in the reply does not match with the "
@@ -192,13 +345,17 @@ static int channel_request(ssh_channel channel, const char *request, int reply,
                 return SSH_ERROR;
             case SSH_MSG_CHANNEL_WINDOW_ADJUST:
                 /* window adjust message could happen here */
-                ssh_buffer_unpack(session->in_buffer, "d", &bytes_to_add);
-                channel->remote_window += bytes_to_add;
-                LOG_NOTICE("remote window adjust to %d",
-                           channel->remote_window);
+                if (ssh_buffer_unpack(session->in_buffer, "d",
+                                      &bytes_to_add) != SSH_OK ||
+                    channel_add_remote_window(channel, bytes_to_add) != SSH_OK)
+                    return SSH_ERROR;
+                break;
+            case SSH_MSG_CHANNEL_REQUEST:
+                if (channel_reject_request(channel) != SSH_OK)
+                    return SSH_ERROR;
                 break;
             default:
-                LOG_ERROR("received type %d during channel open", type);
+                LOG_ERROR("received type %u during channel request", type);
                 return SSH_ERROR;
         }
     }
@@ -262,8 +419,22 @@ static int wait_window(ssh_channel channel) {
     type = 0;
     while (type != SSH_MSG_CHANNEL_WINDOW_ADJUST) {
         rc = ssh_packet_receive(session);
-        if (rc != SSH_OK || ssh_buffer_unpack(session->in_buffer, "bd", &type,
-                                              &recipient_channel) != SSH_OK)
+        if (rc != SSH_OK ||
+            ssh_buffer_get_u8(session->in_buffer, &type) == 0)
+            return SSH_ERROR;
+
+        if (type == SSH_MSG_GLOBAL_REQUEST) {
+            if (channel_handle_global_request(session) != SSH_OK)
+                return SSH_ERROR;
+            continue;
+        }
+        if (type == SSH_MSG_CHANNEL_OPEN) {
+            if (channel_reject_open(session) != SSH_OK) return SSH_ERROR;
+            continue;
+        }
+
+        if (ssh_buffer_unpack(session->in_buffer, "d", &recipient_channel) !=
+            SSH_OK)
             return SSH_ERROR;
         if (recipient_channel != channel->local_channel) {
             LOG_ERROR(
@@ -279,15 +450,21 @@ static int wait_window(ssh_channel channel) {
                           channel->local_channel);
                 return SSH_ERROR;
             case SSH_MSG_CHANNEL_WINDOW_ADJUST:
-                ssh_buffer_unpack(session->in_buffer, "d", &bytes_to_add);
-                LOG_NOTICE("remote window grows: +%d", bytes_to_add);
-                channel->remote_window += bytes_to_add;
-                return SSH_OK;
+                if (ssh_buffer_unpack(session->in_buffer, "d",
+                                      &bytes_to_add) != SSH_OK)
+                    return SSH_ERROR;
+                return channel_add_remote_window(channel, bytes_to_add);
+            case SSH_MSG_CHANNEL_REQUEST:
+                if (channel_reject_request(channel) != SSH_OK)
+                    return SSH_ERROR;
+                break;
             case SSH_MSG_CHANNEL_EOF:
                 LOG_ERROR("channel %d received EOF on window waiting",
                           channel->local_channel);
                 return SSH_ERROR;
             case SSH_MSG_CHANNEL_CLOSE:
+                channel->remote_eof = 2;
+                channel_send_close(channel);
                 LOG_ERROR("remote channel %d closed on window waiting",
                           channel->remote_channel);
                 return SSH_ERROR;
@@ -369,10 +546,14 @@ int ssh_channel_request_sftp(ssh_channel channel) {
     }
 
     rc = ssh_buffer_pack(subsys, "s", "sftp");
-
-    rc = channel_request(channel, "subsystem", 1, subsys);
     if (rc != SSH_OK) {
         ssh_buffer_free(subsys);
+        return SSH_ERROR;
+    }
+
+    rc = channel_request(channel, "subsystem", 1, subsys);
+    ssh_buffer_free(subsys);
+    if (rc != SSH_OK) {
         return SSH_ERROR;
     }
     return SSH_OK;
@@ -390,8 +571,8 @@ int ssh_channel_request_sftp(ssh_channel channel) {
 int ssh_channel_write(ssh_channel channel, const void *data, uint32_t len) {
     ssh_session session;
     uint32_t origlen = len;
-    size_t effectivelen;
-    size_t maxpacketlen;
+    uint32_t effectivelen;
+    uint32_t maxpacketlen;
     int rc;
 
     if (channel == NULL || data == NULL || len > INT_MAX) {
@@ -408,11 +589,11 @@ int ssh_channel_write(ssh_channel channel, const void *data, uint32_t len) {
     }
 
     session = channel->session;
-    /*
-     * Handle the max packet len from remote side
-     * be nice, 10 bytes for the headers
-     */
-    maxpacketlen = channel->remote_maxpacket - 10;
+    maxpacketlen = channel->remote_maxpacket;
+    if (maxpacketlen == 0) {
+        ssh_set_error(SSH_FATAL, "remote channel packet limit is zero");
+        return SSH_ERROR;
+    }
 
     while (len > 0) {
         if (channel->remote_window < len) {
@@ -432,7 +613,7 @@ int ssh_channel_write(ssh_channel channel, const void *data, uint32_t len) {
         if (rc != SSH_OK) goto error;
 
         rc = ssh_buffer_pack(session->out_buffer, "dP", effectivelen,
-                             effectivelen, data);
+                             (size_t)effectivelen, data);
         if (rc != SSH_OK) goto error;
 
         rc = ssh_packet_send(session);
@@ -462,42 +643,67 @@ error:
  */
 int ssh_channel_read(ssh_channel channel, void *dest, uint32_t count) {
     ssh_session session;
-    static ssh_buffer buf = NULL;
+    ssh_buffer buf;
     ssh_string channel_data = NULL;
     uint8_t type;
     uint32_t recipient_channel;
     uint32_t bytes_to_add;
+    uint32_t data_type;
     uint32_t effectivelen;
     uint32_t nread = 0;
-    ssh_string req;
-    bool want;
+    size_t data_len;
     int rc;
 
-    if (channel == NULL) return SSH_ERROR;
+    if (channel == NULL || (dest == NULL && count > 0)) return SSH_ERROR;
     session = channel->session;
+    buf = channel->out_buffer;
 
-    if (channel->remote_eof) return SSH_EOF;
+    if (count == 0) return 0;
+    if (channel->remote_eof && ssh_buffer_get_len(buf) == 0) return SSH_EOF;
 
-    if (buf == NULL) buf = ssh_buffer_new();
-
-    /* local window should be at least `count` size */
-    if (count >= channel->local_window) {
-        grow_window(channel, count);
-    }
+    if (buf == NULL) return SSH_ERROR;
 
     while (count > 0) {
         if (ssh_buffer_get_len(buf) > 0) {
             /* try to read channel data from static buffer first */
-            // LAB: insert your code here.
+            effectivelen = MIN(count, ssh_buffer_get_len(buf));
+            if (ssh_buffer_get_data(buf, (uint8_t *)dest + nread,
+                                    effectivelen) != effectivelen)
+                goto error;
+            if (ssh_buffer_get_len(buf) == 0) ssh_buffer_reinit(buf);
+
+            count -= effectivelen;
+            nread += effectivelen;
+
+            if (channel->local_window < CHANNEL_INITIAL_WINDOW / 2 &&
+                grow_window(channel,
+                            channel->local_window + effectivelen) != SSH_OK)
+                goto error;
 
         } else {
+            if (channel->remote_eof) return nread > 0 ? (int)nread : SSH_EOF;
+
             /* static buffer has insufficient data, read another
              * SSH_MSG_CHANNEL_DATA packet */
             rc = ssh_packet_receive(session);
             if (rc != SSH_OK) goto error;
 
-            rc = ssh_buffer_unpack(session->in_buffer, "bd", &type,
+            rc = ssh_buffer_get_u8(session->in_buffer, &type);
+            if (rc == 0) goto error;
+
+            if (type == SSH_MSG_GLOBAL_REQUEST) {
+                if (channel_handle_global_request(session) != SSH_OK)
+                    goto error;
+                continue;
+            }
+            if (type == SSH_MSG_CHANNEL_OPEN) {
+                if (channel_reject_open(session) != SSH_OK) goto error;
+                continue;
+            }
+
+            rc = ssh_buffer_unpack(session->in_buffer, "d",
                                    &recipient_channel);
+            if (rc != SSH_OK) goto error;
             if (recipient_channel != channel->local_channel) {
                 LOG_ERROR(
                     "channel number in the reply %d does not match with the "
@@ -508,23 +714,81 @@ int ssh_channel_read(ssh_channel channel, void *dest, uint32_t count) {
             switch (type) {
                 case SSH_MSG_CHANNEL_WINDOW_ADJUST:
                     /* window adjust message could happen here */
-                    // LAB: insert your code here.
+                    if (ssh_buffer_unpack(session->in_buffer, "d",
+                                          &bytes_to_add) != SSH_OK ||
+                        channel_add_remote_window(channel, bytes_to_add) !=
+                            SSH_OK)
+                        goto error;
+                    break;
 
                 case SSH_MSG_CHANNEL_DATA:
-                    // LAB: insert your code here.
+                    if (ssh_buffer_unpack(session->in_buffer, "S",
+                                          &channel_data) != SSH_OK ||
+                        channel_data == NULL)
+                        goto error;
+
+                    data_len = ssh_string_len(channel_data);
+                    if (data_len > channel->local_window ||
+                        data_len > channel->local_maxpacket) {
+                        LOG_ERROR("channel data exceeds receive limits");
+                        goto error;
+                    }
+
+                    if (data_len > 0 &&
+                        ssh_buffer_add_data(buf, ssh_string_data(channel_data),
+                                            (uint32_t)data_len) != SSH_OK)
+                        goto error;
+                    channel->local_window -= (uint32_t)data_len;
+                    SSH_STRING_FREE(channel_data);
+                    break;
+
+                case SSH_MSG_CHANNEL_EXTENDED_DATA:
+                    if (ssh_buffer_unpack(session->in_buffer, "dS", &data_type,
+                                          &channel_data) != SSH_OK ||
+                        channel_data == NULL)
+                        goto error;
+
+                    data_len = ssh_string_len(channel_data);
+                    if (data_len > channel->local_window ||
+                        data_len > channel->local_maxpacket) {
+                        LOG_ERROR("extended channel data exceeds receive limits");
+                        goto error;
+                    }
+                    channel->local_window -= (uint32_t)data_len;
+                    LOG_WARNING("discarding extended channel data type %u",
+                                data_type);
+                    SSH_STRING_FREE(channel_data);
+                    if (channel->local_window < CHANNEL_INITIAL_WINDOW / 2 &&
+                        grow_window(channel,
+                                    channel->local_window +
+                                        (uint32_t)data_len) != SSH_OK)
+                        goto error;
+                    break;
 
                 case SSH_MSG_CHANNEL_EOF:
-                    // LAB: insert your code here.
+                    channel->remote_eof = 1;
+                    return nread > 0 ? (int)nread : SSH_EOF;
 
                 case SSH_MSG_CHANNEL_CLOSE:
-                    // LAB: insert your code here.
+                    channel->remote_eof = 2;
+                    if (channel_send_close(channel) != SSH_OK) goto error;
+                    return nread > 0 ? (int)nread : SSH_EOF;
 
                 case SSH_MSG_CHANNEL_REQUEST:
-                    // LAB: insert your code here.
+                    if (channel_reject_request(channel) != SSH_OK) goto error;
+                    break;
+
+                case SSH_MSG_CHANNEL_SUCCESS:
+                    LOG_NOTICE("received channel request success");
+                    break;
+
+                case SSH_MSG_CHANNEL_FAILURE:
+                    LOG_ERROR("received channel request failure");
+                    goto error;
 
                 default:
-                    // LAB: insert your code here.
-
+                    LOG_ERROR("unexpected channel message type %u", type);
+                    goto error;
             }
         }
     }
@@ -532,14 +796,8 @@ int ssh_channel_read(ssh_channel channel, void *dest, uint32_t count) {
     return nread;
 
 error:
-    if (buf != NULL) ssh_buffer_free(buf);
-    if (channel_data != NULL) ssh_string_free(channel_data);
+    SSH_STRING_FREE(channel_data);
     return SSH_ERROR;
-
-cleanup:
-    if (buf != NULL) ssh_buffer_free(buf);
-    if (channel_data != NULL) ssh_string_free(channel_data);
-    return SSH_EOF;
 }
 
 /**
@@ -595,6 +853,7 @@ int ssh_channel_close(ssh_channel channel) {
     ssh_session session;
     uint8_t type;
     uint32_t recipient_channel;
+    uint32_t bytes_to_add;
     int rc;
 
     if (channel == NULL) {
@@ -608,21 +867,30 @@ int ssh_channel_close(ssh_channel channel) {
         return rc;
     }
 
-    rc = ssh_buffer_pack(session->out_buffer, "bd", SSH_MSG_CHANNEL_CLOSE,
-                         channel->remote_channel);
-    if (rc != SSH_OK) {
-        LOG_ERROR("can not create buffer");
-        goto error;
-    }
+    rc = channel_send_close(channel);
+    if (rc != SSH_OK) return SSH_ERROR;
 
-    rc = ssh_packet_send(session);
+    if (channel->remote_eof == 2) return SSH_OK;
 
     /* wait for SSH_MSG_CHANNEL_CLOSE reply */
-    type = 0;
-    while (type != SSH_MSG_CHANNEL_CLOSE) {
+    while (1) {
         rc = ssh_packet_receive(session);
-        rc = ssh_buffer_unpack(session->in_buffer, "bd", &type,
-                               &recipient_channel);
+        if (rc != SSH_OK ||
+            ssh_buffer_get_u8(session->in_buffer, &type) == 0)
+            return SSH_ERROR;
+
+        if (type == SSH_MSG_GLOBAL_REQUEST) {
+            if (channel_handle_global_request(session) != SSH_OK)
+                return SSH_ERROR;
+            continue;
+        }
+        if (type == SSH_MSG_CHANNEL_OPEN) {
+            if (channel_reject_open(session) != SSH_OK) return SSH_ERROR;
+            continue;
+        }
+
+        rc = ssh_buffer_unpack(session->in_buffer, "d", &recipient_channel);
+        if (rc != SSH_OK) return SSH_ERROR;
         if (recipient_channel != channel->local_channel) {
             LOG_ERROR(
                 "channel number in the reply %d does not match with the "
@@ -630,14 +898,33 @@ int ssh_channel_close(ssh_channel channel) {
                 recipient_channel, channel->local_channel);
             return SSH_ERROR;
         }
-        LOG_NOTICE("received code %d during channel close", type);
+
+        switch (type) {
+            case SSH_MSG_CHANNEL_CLOSE:
+                channel->remote_eof = 2;
+                return SSH_OK;
+            case SSH_MSG_CHANNEL_EOF:
+                channel->remote_eof = 1;
+                break;
+            case SSH_MSG_CHANNEL_WINDOW_ADJUST:
+                if (ssh_buffer_unpack(session->in_buffer, "d",
+                                      &bytes_to_add) != SSH_OK ||
+                    channel_add_remote_window(channel, bytes_to_add) != SSH_OK)
+                    return SSH_ERROR;
+                break;
+            case SSH_MSG_CHANNEL_REQUEST:
+                if (channel_reject_request(channel) != SSH_OK)
+                    return SSH_ERROR;
+                break;
+            case SSH_MSG_CHANNEL_SUCCESS:
+            case SSH_MSG_CHANNEL_FAILURE:
+                break;
+            default:
+                LOG_ERROR("unexpected message type %u during channel close",
+                          type);
+                return SSH_ERROR;
+        }
     }
-
-    return SSH_OK;
-
-error:
-    ssh_buffer_reinit(session->out_buffer);
-    return SSH_ERROR;
 }
 
 /**
