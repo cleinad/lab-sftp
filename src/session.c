@@ -202,6 +202,7 @@ int send_id_str(ssh_session session) {
 int receive_id_str(ssh_session session) {
     char buffer[256] = {0};
     size_t len = 0;
+    unsigned int preamble_lines = 0;
 
     /**
      * The server MAY send other lines of data before sending the version 
@@ -234,13 +235,25 @@ int receive_id_str(ssh_session session) {
         }
         buffer[len] = '\0';
 
-        if (len >= 4 && memcmp(buffer, "SSH-", 4) == 0) {
+        if ((len >= 8 && memcmp(buffer, "SSH-2.0-", 8) == 0) ||
+            (len >= 9 && memcmp(buffer, "SSH-1.99-", 9) == 0)) {
             session->server_id_str = strdup(buffer);
             if (session->server_id_str == NULL) {
                 return SSH_ERROR;
             }
             LOG_INFO("server identification: %s", session->server_id_str);
             return SSH_OK;
+        }
+
+        if (len >= 4 && memcmp(buffer, "SSH-", 4) == 0) {
+            ssh_set_error(SSH_FATAL, "unsupported server identification: %s",
+                          buffer);
+            return SSH_ERROR;
+        }
+        if (++preamble_lines > 50) {
+            ssh_set_error(SSH_FATAL,
+                          "too many lines before server identification");
+            return SSH_ERROR;
         }
 
         len = 0;

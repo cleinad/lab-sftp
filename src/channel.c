@@ -199,7 +199,7 @@ static int channel_open(ssh_channel channel, const char *type, uint32_t window,
 
     while (1) {
         /* wait until the channel is opened or an error occurs */
-        rc = ssh_packet_receive(session);
+        rc = ssh_packet_receive_message(session);
         if (rc != SSH_OK) return SSH_ERROR;
 
         rc = ssh_buffer_get_u8(session->in_buffer, &reply_type);
@@ -312,7 +312,7 @@ static int channel_request(ssh_channel channel, const char *request, int reply,
 
     while (1) {
         /* wait for reply or an error occurs */
-        if (ssh_packet_receive(session) != SSH_OK) {
+        if (ssh_packet_receive_message(session) != SSH_OK) {
             return SSH_ERROR;
         }
 
@@ -378,6 +378,7 @@ static int grow_window(ssh_channel channel, uint32_t minimum_size) {
     int rc;
 
     if (channel == NULL) return SSH_ERROR;
+    if (channel->local_eof == 2 || channel->remote_eof == 2) return SSH_OK;
     session = channel->session;
 
     if (channel->local_window >= minimum_size) return SSH_OK;
@@ -400,6 +401,23 @@ error:
     return SSH_ERROR;
 }
 
+static int channel_adjust_receive_window(ssh_channel channel) {
+    uint32_t bytes_to_add;
+
+    if (channel->local_eof == 2 || channel->remote_eof == 2 ||
+        channel->local_window >= CHANNEL_INITIAL_WINDOW / 2) {
+        return SSH_OK;
+    }
+
+    bytes_to_add = CHANNEL_INITIAL_WINDOW - channel->local_window;
+    if (channel->local_consumed < bytes_to_add) return SSH_OK;
+    if (grow_window(channel, CHANNEL_INITIAL_WINDOW) != SSH_OK)
+        return SSH_ERROR;
+
+    channel->local_consumed -= bytes_to_add;
+    return SSH_OK;
+}
+
 /**
  * @brief Wait for WINDOW_ADJUST message to grow remote window.
  *
@@ -411,6 +429,9 @@ static int wait_window(ssh_channel channel) {
     uint8_t type;
     uint32_t recipient_channel;
     uint32_t bytes_to_add;
+    uint32_t data_type;
+    ssh_string channel_data = NULL;
+    size_t data_len;
     int rc;
 
     if (channel == NULL) return SSH_ERROR;
@@ -418,7 +439,7 @@ static int wait_window(ssh_channel channel) {
 
     type = 0;
     while (type != SSH_MSG_CHANNEL_WINDOW_ADJUST) {
-        rc = ssh_packet_receive(session);
+        rc = ssh_packet_receive_message(session);
         if (rc != SSH_OK ||
             ssh_buffer_get_u8(session->in_buffer, &type) == 0)
             return SSH_ERROR;
@@ -446,9 +467,43 @@ static int wait_window(ssh_channel channel) {
 
         switch (type) {
             case SSH_MSG_CHANNEL_DATA:
-                LOG_ERROR("channel %d received data on window waiting",
-                          channel->local_channel);
-                return SSH_ERROR;
+                if (ssh_buffer_unpack(session->in_buffer, "S",
+                                      &channel_data) != SSH_OK ||
+                    channel_data == NULL)
+                    goto error;
+                data_len = ssh_string_len(channel_data);
+                if (data_len > channel->local_window ||
+                    data_len > channel->local_maxpacket) {
+                    LOG_ERROR("channel data exceeds receive limits");
+                    goto error;
+                }
+                if (data_len > 0 &&
+                    ssh_buffer_add_data(channel->out_buffer,
+                                        ssh_string_data(channel_data),
+                                        (uint32_t)data_len) != SSH_OK)
+                    goto error;
+                channel->local_window -= (uint32_t)data_len;
+                SSH_STRING_FREE(channel_data);
+                break;
+            case SSH_MSG_CHANNEL_EXTENDED_DATA:
+                if (ssh_buffer_unpack(session->in_buffer, "dS", &data_type,
+                                      &channel_data) != SSH_OK ||
+                    channel_data == NULL)
+                    goto error;
+                data_len = ssh_string_len(channel_data);
+                if (data_len > channel->local_window ||
+                    data_len > channel->local_maxpacket) {
+                    LOG_ERROR("extended channel data exceeds receive limits");
+                    goto error;
+                }
+                channel->local_window -= (uint32_t)data_len;
+                channel->local_consumed += (uint32_t)data_len;
+                LOG_WARNING("discarding extended channel data type %u",
+                            data_type);
+                SSH_STRING_FREE(channel_data);
+                if (channel_adjust_receive_window(channel) != SSH_OK)
+                    goto error;
+                break;
             case SSH_MSG_CHANNEL_WINDOW_ADJUST:
                 if (ssh_buffer_unpack(session->in_buffer, "d",
                                       &bytes_to_add) != SSH_OK)
@@ -475,6 +530,10 @@ static int wait_window(ssh_channel channel) {
     }
 
     return SSH_OK;
+
+error:
+    SSH_STRING_FREE(channel_data);
+    return SSH_ERROR;
 }
 
 /**
@@ -596,17 +655,15 @@ int ssh_channel_write(ssh_channel channel, const void *data, uint32_t len) {
     }
 
     while (len > 0) {
-        if (channel->remote_window < len) {
-            if (channel->remote_window == 0) {
-                /* can not send, wait for window adjust message */
-                rc = wait_window(channel);
-                if (rc != SSH_OK) goto error;
-            }
-            effectivelen = MIN(len, channel->remote_window);
-        } else {
-            effectivelen = len;
+        while (channel->remote_window == 0) {
+            /* can not send, wait for window adjust message */
+            rc = wait_window(channel);
+            if (rc != SSH_OK) goto error;
         }
+        effectivelen = MIN(len, channel->remote_window);
         effectivelen = MIN(effectivelen, maxpacketlen);
+        effectivelen = MIN(effectivelen, CHANNEL_MAX_PACKET);
+        if (effectivelen == 0) continue;
 
         rc = ssh_buffer_pack(session->out_buffer, "bd", SSH_MSG_CHANNEL_DATA,
                              channel->remote_channel);
@@ -674,10 +731,8 @@ int ssh_channel_read(ssh_channel channel, void *dest, uint32_t count) {
 
             count -= effectivelen;
             nread += effectivelen;
-
-            if (channel->local_window < CHANNEL_INITIAL_WINDOW / 2 &&
-                grow_window(channel,
-                            channel->local_window + effectivelen) != SSH_OK)
+            channel->local_consumed += effectivelen;
+            if (channel_adjust_receive_window(channel) != SSH_OK)
                 goto error;
 
         } else {
@@ -685,7 +740,7 @@ int ssh_channel_read(ssh_channel channel, void *dest, uint32_t count) {
 
             /* static buffer has insufficient data, read another
              * SSH_MSG_CHANNEL_DATA packet */
-            rc = ssh_packet_receive(session);
+            rc = ssh_packet_receive_message(session);
             if (rc != SSH_OK) goto error;
 
             rc = ssh_buffer_get_u8(session->in_buffer, &type);
@@ -755,13 +810,11 @@ int ssh_channel_read(ssh_channel channel, void *dest, uint32_t count) {
                         goto error;
                     }
                     channel->local_window -= (uint32_t)data_len;
+                    channel->local_consumed += (uint32_t)data_len;
                     LOG_WARNING("discarding extended channel data type %u",
                                 data_type);
                     SSH_STRING_FREE(channel_data);
-                    if (channel->local_window < CHANNEL_INITIAL_WINDOW / 2 &&
-                        grow_window(channel,
-                                    channel->local_window +
-                                        (uint32_t)data_len) != SSH_OK)
+                    if (channel_adjust_receive_window(channel) != SSH_OK)
                         goto error;
                     break;
 
@@ -874,7 +927,7 @@ int ssh_channel_close(ssh_channel channel) {
 
     /* wait for SSH_MSG_CHANNEL_CLOSE reply */
     while (1) {
-        rc = ssh_packet_receive(session);
+        rc = ssh_packet_receive_message(session);
         if (rc != SSH_OK ||
             ssh_buffer_get_u8(session->in_buffer, &type) == 0)
             return SSH_ERROR;

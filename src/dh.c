@@ -14,6 +14,7 @@
 #include "libsftp/bignum.h"
 #include "libsftp/buffer.h"
 #include "libsftp/crypto.h"
+#include "libsftp/error.h"
 #include "libsftp/logger.h"
 #include "libsftp/packet.h"
 #include "libsftp/pki.h"
@@ -576,20 +577,44 @@ static int dh_send_init(ssh_session session) {
  */
 static int dh_receive_reply(ssh_session session) {
     struct ssh_crypto_struct *crypto = session->next_crypto;
-    bignum server_pubkey;
+    bignum server_pubkey = NULL;
+    bignum one = NULL;
+    bignum p_minus_one = NULL;
     uint8_t type;
     int rc;
 
-    rc = ssh_packet_receive(session);
+    rc = ssh_packet_receive_message(session);
     if (rc != SSH_OK) return rc;
 
-    ssh_buffer_get_u8(session->in_buffer, &type);
+    if (ssh_buffer_get_u8(session->in_buffer, &type) != 1) return SSH_ERROR;
     if (type != SSH_MSG_KEXDH_REPLY) return SSH_ERROR;
 
     rc = ssh_buffer_unpack(session->in_buffer, "SBS",
                            &crypto->server_pubkey_blob, &server_pubkey,
                            &crypto->dh_server_signature);
     if (rc != SSH_OK) return rc;
+
+    one = bignum_new();
+    p_minus_one = bignum_new();
+    if (one == NULL || p_minus_one == NULL ||
+        bignum_set_word(one, 1) != 1 ||
+        bignum_sub(p_minus_one, crypto->dh_ctx->modulus, one) != 1) {
+        bignum_safe_free(one);
+        bignum_safe_free(p_minus_one);
+        bignum_safe_free(server_pubkey);
+        return SSH_ERROR;
+    }
+    if (bignum_cmp(server_pubkey, one) <= 0 ||
+        bignum_cmp(server_pubkey, p_minus_one) >= 0) {
+        ssh_set_error(SSH_FATAL, "invalid server Diffie-Hellman public value");
+        LOG_ERROR("invalid server Diffie-Hellman public value");
+        bignum_safe_free(one);
+        bignum_safe_free(p_minus_one);
+        bignum_safe_free(server_pubkey);
+        return SSH_ERROR;
+    }
+    bignum_safe_free(one);
+    bignum_safe_free(p_minus_one);
 
     rc = dh_keypair_set_keys(crypto->dh_ctx, DH_SERVER_KEYPAIR, NULL,
                              server_pubkey);
@@ -637,10 +662,10 @@ static int dh_set_new_keys(ssh_session session) {
     uint8_t type;
     int rc;
 
-    rc = ssh_packet_receive(session);
+    rc = ssh_packet_receive_message(session);
     if (rc != SSH_OK) return rc;
 
-    ssh_buffer_get_u8(session->in_buffer, &type);
+    if (ssh_buffer_get_u8(session->in_buffer, &type) != 1) return SSH_ERROR;
     if (type != SSH_MSG_NEWKEYS) return SSH_ERROR;
 
     /* NEWKEYS received, now its time to activate encryption */

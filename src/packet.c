@@ -332,6 +332,44 @@ error:
     return SSH_ERROR;
 }
 
+int ssh_packet_receive_message(ssh_session session) {
+    uint8_t type;
+
+    for (;;) {
+        uint32_t reason = 0;
+        char *description = NULL;
+        char *language = NULL;
+        int rc = ssh_packet_receive(session);
+
+        if (rc != SSH_OK) return rc;
+        if (ssh_buffer_get_len(session->in_buffer) == 0) {
+            ssh_set_error(SSH_FATAL, "empty SSH message");
+            return SSH_ERROR;
+        }
+
+        type = *(uint8_t *)ssh_buffer_get(session->in_buffer);
+        if (type == SSH_MSG_IGNORE || type == SSH_MSG_DEBUG ||
+            type == SSH_MSG_UNIMPLEMENTED) {
+            continue;
+        }
+        if (type != SSH_MSG_DISCONNECT) return SSH_OK;
+
+        if (ssh_buffer_get_u8(session->in_buffer, &type) != 1 ||
+            ssh_buffer_unpack(session->in_buffer, "dss", &reason,
+                              &description, &language) != SSH_OK) {
+            ssh_set_error(SSH_FATAL, "server sent malformed disconnect");
+            LOG_ERROR("server sent malformed disconnect");
+        } else {
+            ssh_set_error(SSH_FATAL, "server disconnected (%u): %s", reason,
+                          description);
+            LOG_ERROR("server disconnected (%u): %s", reason, description);
+        }
+        SAFE_FREE(description);
+        SAFE_FREE(language);
+        return SSH_ERROR;
+    }
+}
+
 /**
  * @brief Encapsulate a binary packet from payload and encrypt it if key
  * exchange is completed. Send the encrypted packet to the socket.

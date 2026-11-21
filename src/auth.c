@@ -38,7 +38,7 @@ int ssh_request_auth(ssh_session session) {
     rc |= ssh_packet_send(session);
     if (rc != SSH_OK) return rc;
 
-    rc = ssh_packet_receive(session);
+    rc = ssh_packet_receive_message(session);
     if (rc != SSH_OK) return rc;
 
     rc = ssh_buffer_unpack(session->in_buffer, "bs", &type, &service);
@@ -49,6 +49,7 @@ int ssh_request_auth(ssh_session session) {
     }
 
     SAFE_FREE(service);
+    session->auth_password_attempts = 0;
     return SSH_OK;
 }
 
@@ -97,7 +98,6 @@ void ssh_get_password(char *password) {
 int ssh_userauth_password(ssh_session session, const char *password) {
     int rc;
     uint8_t type;
-    static int cnt = 0;
 
     rc = ssh_buffer_pack(session->out_buffer, "bsssbs",
                          SSH_MSG_USERAUTH_REQUEST, session->opts.username,
@@ -117,9 +117,9 @@ int ssh_userauth_password(ssh_session session, const char *password) {
      */
 
     while (rc != SSH_ERROR) {
-        rc = ssh_packet_receive(session);
+        rc = ssh_packet_receive_message(session);
         if (rc != SSH_OK) goto error;
-        ssh_buffer_get_u8(session->in_buffer, &type);
+        if (ssh_buffer_get_u8(session->in_buffer, &type) != 1) goto error;
         switch (type) {
             case SSH_MSG_USERAUTH_BANNER: {
                 char *message = NULL;
@@ -140,7 +140,7 @@ int ssh_userauth_password(ssh_session session, const char *password) {
             }
 
             case SSH_MSG_USERAUTH_SUCCESS:
-                cnt = 0;
+                session->auth_password_attempts = 0;
                 return SSH_OK;
 
             case SSH_MSG_USERAUTH_PASSWD_CHANGEREQ:
@@ -171,8 +171,8 @@ int ssh_userauth_password(ssh_session session, const char *password) {
                     }
                 }
 
-                cnt++;
-                if (password_allowed && cnt < 3) {
+                session->auth_password_attempts++;
+                if (password_allowed && session->auth_password_attempts < 3) {
                     ssh_set_error(SSH_REQUEST_DENIED,
                                   "authentication failed; try again\n");
                     SAFE_FREE(methods);

@@ -20,8 +20,8 @@
 #include "libsftp/session.h"
 #include "libsftp/util.h"
 
-/* Buffer size maximum is 256M */
-#define SFTP_PACKET_SIZE_MAX 0x10000000
+/* Maximum accepted SFTP packet size is 256 KiB. */
+#define SFTP_PACKET_SIZE_MAX (256 * 1024)
 #define SFTP_BUFFER_SIZE_MAX 16384
 
 struct sftp_session_struct {
@@ -185,15 +185,16 @@ int sftp_init(sftp_session sftp) {
         return SSH_ERROR;
     }
 
-    if (version != sftp->version) {
-        LOG_ERROR("sftp server version %d does not match client version %d",
+    if (version < sftp->version) {
+        LOG_ERROR("sftp server version %d is older than client version %d",
                   version, sftp->version);
         ssh_set_error(SSH_REQUEST_DENIED,
-                      "version mismatch (server: %d client: %d)", version,
+                      "unsupported version (server: %d client: %d)", version,
                       sftp->version);
         sftp_packet_free(response);
         return SSH_ERROR;
     }
+    sftp->version = MIN(sftp->version, version);
 
     sftp_packet_free(response);
     return SSH_OK;
@@ -290,42 +291,45 @@ error:
 }
 
 int sftp_close(sftp_file file) {
-    sftp_session sftp = file->sftp;
-    ssh_string handle = file->handle;
+    sftp_session sftp;
+    ssh_string handle;
     sftp_packet response = NULL;
     sftp_status status = NULL;
     ssh_buffer buffer = NULL;
     uint32_t id;
-    int rc;
+    int rc = SSH_ERROR;
+
+    if (file == NULL) return SSH_ERROR;
+    sftp = file->sftp;
+    handle = file->handle;
 
     buffer = ssh_buffer_new();
     if (buffer == NULL) {
-        LOG_CRITICAL("can not create ssh buffer");
+        LOG_ERROR("can not create ssh buffer");
         ssh_set_error(SSH_FATAL, "buffer error");
-        return SSH_ERROR;
+        goto out;
     }
 
     id = sftp_get_new_id(sftp);
 
     if (ssh_buffer_pack(buffer, "dS", id, handle) != SSH_OK) {
-        LOG_CRITICAL("can not pack buffer");
+        LOG_ERROR("can not pack buffer");
         ssh_set_error(SSH_FATAL, "buffer error");
-        ssh_buffer_free(buffer);
-        return SSH_ERROR;
+        goto out;
     }
 
     if (sftp_packet_write(sftp, SSH_FXP_CLOSE, buffer) < 0) {
-        LOG_CRITICAL("can not send close request");
+        LOG_ERROR("can not send close request");
         ssh_set_error(SSH_FATAL, "close request error");
-        ssh_buffer_free(buffer);
-        return SSH_ERROR;
+        goto out;
     }
     ssh_buffer_free(buffer);
+    buffer = NULL;
 
     response = sftp_packet_read(sftp);
     if (response == NULL) {
         ssh_set_error(SSH_FATAL, "can not read sftp packet");
-        return SSH_ERROR;
+        goto out;
     }
 
     switch (response->type) {
@@ -350,6 +354,8 @@ int sftp_close(sftp_file file) {
             break;
     }
 
+out:
+    ssh_buffer_free(buffer);
     sftp_status_free(status);
     sftp_packet_free(response);
     sftp_file_free(file);
@@ -574,8 +580,7 @@ sftp_packet sftp_packet_read(sftp_session sftp) {
 
     memcpy(&packet_len_network, buffer, sizeof(packet_len_network));
     packet_len = ntohl(packet_len_network);
-    if (packet_len < sizeof(uint8_t) ||
-        packet_len - sizeof(uint8_t) >= SFTP_PACKET_SIZE_MAX) {
+    if (packet_len < sizeof(uint8_t) || packet_len > SFTP_PACKET_SIZE_MAX) {
         LOG_ERROR("invalid sftp packet length %u", packet_len);
         goto error;
     }
