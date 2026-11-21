@@ -141,6 +141,7 @@ int ssh_userauth_password(ssh_session session, const char *password) {
 
             case SSH_MSG_USERAUTH_SUCCESS:
                 session->auth_password_attempts = 0;
+                LOG_INFO("authentication succeeded (SSH_MSG_USERAUTH_SUCCESS)");
                 return SSH_OK;
 
             case SSH_MSG_USERAUTH_PASSWD_CHANGEREQ:
