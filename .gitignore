@@ -2,3 +2,4 @@
 build/
 build-linux/
 harness/out/
+/*.zip
