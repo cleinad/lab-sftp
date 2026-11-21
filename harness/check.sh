@@ -2,6 +2,7 @@
 # Build the lab client in Linux and run it against a legacy-enabled OpenSSH server.
 # Usage: harness/check.sh [repo_dir]   (default: this script's repo)
 # Env: CFLAGS_EXTRA="-fsanitize=address -g"  REFERENCE=1 (use stock sftp instead of ./client)
+#      SIZE_MB=8 (transfer a random file of that size instead of client.c)
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "${1:-$HERE/..}" && pwd)"
@@ -21,7 +22,7 @@ docker run -d --name "$SRV" --network "$NET" --network-alias sshd lab4-sshd >/de
 # Build, then run one session: put client.c, delete local copy, get it back.
 docker run --rm --network "$NET" --cap-add NET_RAW --cap-add NET_ADMIN \
   -v "$REPO":/src -e PASS="$PASS" -e TIMEOUT="$TIMEOUT" -e REFERENCE="${REFERENCE:-0}" \
-  -e CFLAGS_EXTRA="${CFLAGS_EXTRA:-}" lab4-build bash -c '
+  -e CFLAGS_EXTRA="${CFLAGS_EXTRA:-}" -e SIZE_MB="${SIZE_MB:-0}" lab4-build bash -c '
 set -u; cd /src; O=/src/harness/out
 if [ "$REFERENCE" = 1 ]; then echo "reference mode: stock client" > $O/build.log
 else
@@ -29,28 +30,31 @@ else
   cmake --build build-linux -j >> $O/build.log 2>&1 || { echo BUILD_FAILED >> $O/build.log; exit 3; }
 fi
 tcpdump -i eth0 -U -w $O/session.pcap tcp port 22 2> /dev/null & TD=$!; sleep 1
-W=$(mktemp -d); cp /src/client.c $W/client.c; cp /src/client.c $W/orig.c; cd $W
+W=$(mktemp -d); N=client.c
+if [ "$SIZE_MB" != 0 ]; then N=big.bin; head -c $((SIZE_MB*1048576)) /dev/urandom > $W/$N; else cp /src/client.c $W/$N; fi
+cp $W/$N $O/sent.bin; cd $W
 if [ "$REFERENCE" = 1 ]; then
-  mkdir dl; printf "put client.c\nlcd dl\nget client.c\nbye\n" > cmds
+  mkdir dl; printf "put $N\nlcd dl\nget $N\nbye\n" > cmds
   timeout $TIMEOUT sshpass -p "$PASS" sftp -oBatchMode=no -oStrictHostKeyChecking=no -oKexAlgorithms=diffie-hellman-group1-sha1 \
     -oHostKeyAlgorithms=ssh-rsa -oCiphers=aes256-cbc -oMACs=hmac-sha1 -b cmds tester@sshd > $O/client.log 2>&1
 else
   # Session 1 uploads; session 2 downloads into an empty dir.
   mkdir dl
-  { echo "$PASS"; echo put; echo client.c; } > in1
+  { echo "$PASS"; echo put; echo $N; } > in1
   timeout $TIMEOUT /src/build-linux/client tester@sshd < <(cat in1; sleep 2; echo bye) > $O/client.log 2>&1
   echo "exit=$?" >> $O/client.log
   cd dl
-  timeout $TIMEOUT /src/build-linux/client tester@sshd < <(printf "%s\nget\nclient.c\n" "$PASS"; sleep 2; echo bye) >> $O/client.log 2>&1
+  timeout $TIMEOUT /src/build-linux/client tester@sshd < <(printf "%s\nget\n%s\n" "$PASS" "$N"; sleep 2; echo bye) >> $O/client.log 2>&1
   echo "exit=$?" >> $O/client.log
   cd $W
 fi
 sleep 1; kill $TD 2>/dev/null; wait $TD 2>/dev/null
-cmp -s $W/orig.c $W/dl/client.c && echo DOWNLOAD_MATCH > $O/download.txt || echo DOWNLOAD_MISMATCH > $O/download.txt
+cmp -s $O/sent.bin $W/dl/$N && echo DOWNLOAD_MATCH > $O/download.txt || echo DOWNLOAD_MISMATCH > $O/download.txt
 chmod -R a+rw $O
 '
 docker logs "$SRV" > "$OUT/sshd.log" 2>&1
-docker exec "$SRV" cat /home/tester/client.c > "$OUT/remote_client.c" 2>/dev/null
+RN=client.c; [ "${SIZE_MB:-0}" != 0 ] && RN=big.bin
+docker exec "$SRV" cat /home/tester/$RN > "$OUT/remote.bin" 2>/dev/null
 cleanup; trap - EXIT
 
 # Grade.
@@ -68,7 +72,7 @@ if grep -q 'SSH2_MSG_NEWKEYS received' "$L" && [ -s "$OUT/session.pcap" ] && ! g
   ok CP3b PASS 'no plaintext after NEWKEYS in pcap'; else ok CP3b FAIL 'no plaintext after NEWKEYS in pcap'; fi
 chk CP4 'Accepted password for tester'                       'password auth'
 chk CP5 'subsystem request for sftp'                         'session channel + sftp subsystem'
-cmp -s "$REPO/client.c" "$OUT/remote_client.c" && ok CP6a PASS 'upload matches' || ok CP6a FAIL 'upload matches'
+cmp -s "$OUT/sent.bin" "$OUT/remote.bin" && ok CP6a PASS 'upload matches' || ok CP6a FAIL 'upload matches'
 grep -q DOWNLOAD_MATCH "$OUT/download.txt" 2>/dev/null && ok CP6b PASS 'download matches' || ok CP6b FAIL 'download matches'
 grep -qE 'Corrupted MAC|Bad packet length|rcvd too much data|Disconnecting' "$L" && echo "note: server complaints: $(grep -oE 'Corrupted MAC[^\r]*|Bad packet length[^\r]*|rcvd too much data[^\r]*|Disconnecting[^\r]*' "$L" | sort -u | head -3 | tr '\n' ';')"
 echo "logs: $OUT"; [ $fails -eq 0 ] && echo ALL_PASS || { echo "FAILED: $fails"; exit 1; }
