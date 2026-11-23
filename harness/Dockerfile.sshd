@@ -1,0 +1,8 @@
+FROM ubuntu:24.04
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      openssh-server && rm -rf /var/lib/apt/lists/* && mkdir -p /run/sshd
+# Test-only account; password is in harness/README.md.
+RUN useradd -m -s /bin/bash tester && echo 'tester:lab4test' | chpasswd
+COPY sshd_lab4.conf /etc/ssh/sshd_config.d/lab4.conf
+RUN ssh-keygen -A
+CMD ["/usr/sbin/sshd", "-D", "-e"]

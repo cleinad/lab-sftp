@@ -69,7 +69,7 @@
         char time_buffer[80];                                                \
         char time_sec[80];                                                   \
         strftime(time_sec, 80, TIME_FORMAT, localtime(&t));                  \
-        sprintf(time_buffer, "%s:%ld", time_sec, tv.tv_usec);                 \
+        sprintf(time_buffer, "%s:%ld", time_sec, (long)tv.tv_usec);           \
                                                                              \
         /* enable colour */                                                  \
         fprintf(stderr, "%s", DISPLAY_COLOUR ? colour : "");          \

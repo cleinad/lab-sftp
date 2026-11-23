@@ -1,0 +1,13 @@
+# CP3: messages are encrypted after key exchange
+Server log:
+debug1: SSH2_MSG_NEWKEYS sent [preauth]
+debug1: SSH2_MSG_NEWKEYS received [preauth]
+
+Plaintext search of the whole capture (expect none after NEWKEYS):
+  ssh-userauth    0 matches
+  ssh-connection  0 matches
+  lab4test        0 matches
+  sftp            0 matches
+
+Full capture: cp3-session.pcap (open in Wireshark); hex dump: cp3-hexdump.txt.
+Before NEWKEYS the KEXINIT algorithm names are readable; after it every payload is random-looking AES-256-CBC ciphertext.

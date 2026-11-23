@@ -38,7 +38,7 @@ int ssh_request_auth(ssh_session session) {
     rc |= ssh_packet_send(session);
     if (rc != SSH_OK) return rc;
 
-    rc = ssh_packet_receive(session);
+    rc = ssh_packet_receive_message(session);
     if (rc != SSH_OK) return rc;
 
     rc = ssh_buffer_unpack(session->in_buffer, "bs", &type, &service);
@@ -49,6 +49,7 @@ int ssh_request_auth(ssh_session session) {
     }
 
     SAFE_FREE(service);
+    session->auth_password_attempts = 0;
     return SSH_OK;
 }
 
@@ -97,7 +98,6 @@ void ssh_get_password(char *password) {
 int ssh_userauth_password(ssh_session session, const char *password) {
     int rc;
     uint8_t type;
-    static int cnt = 0;
 
     rc = ssh_buffer_pack(session->out_buffer, "bsssbs",
                          SSH_MSG_USERAUTH_REQUEST, session->opts.username,
@@ -117,23 +117,83 @@ int ssh_userauth_password(ssh_session session, const char *password) {
      */
 
     while (rc != SSH_ERROR) {
-        rc = ssh_packet_receive(session);
+        rc = ssh_packet_receive_message(session);
         if (rc != SSH_OK) goto error;
-        ssh_buffer_get_u8(session->in_buffer, &type);
+        if (ssh_buffer_get_u8(session->in_buffer, &type) != 1) goto error;
         switch (type) {
-            case SSH_MSG_USERAUTH_BANNER:
-                // LAB: insert your code here.
+            case SSH_MSG_USERAUTH_BANNER: {
+                char *message = NULL;
+                char *language = NULL;
+
+                rc = ssh_buffer_unpack(session->in_buffer, "ss", &message,
+                                       &language);
+                if (rc != SSH_OK) {
+                    SAFE_FREE(message);
+                    SAFE_FREE(language);
+                    goto error;
+                }
+
+                fprintf(stdout, "%s\n", message);
+                SAFE_FREE(message);
+                SAFE_FREE(language);
+                break;
+            }
 
             case SSH_MSG_USERAUTH_SUCCESS:
-                // LAB: insert your code here.
+                session->auth_password_attempts = 0;
+                LOG_INFO("authentication succeeded (SSH_MSG_USERAUTH_SUCCESS)");
+                return SSH_OK;
 
             case SSH_MSG_USERAUTH_PASSWD_CHANGEREQ:
-            case SSH_MSG_USERAUTH_FAILURE:
-                // LAB: insert your code here.
+                ssh_set_error(SSH_REQUEST_DENIED,
+                              "password change is not supported");
+                goto error;
+
+            case SSH_MSG_USERAUTH_FAILURE: {
+                char *methods = NULL;
+                uint8_t partial_success;
+                bool password_allowed = false;
+                char *method;
+                char *saveptr = NULL;
+
+                rc = ssh_buffer_unpack(session->in_buffer, "sb", &methods,
+                                       &partial_success);
+                if (rc != SSH_OK) {
+                    SAFE_FREE(methods);
+                    goto error;
+                }
+
+                for (method = strtok_r(methods, ",", &saveptr);
+                     method != NULL;
+                     method = strtok_r(NULL, ",", &saveptr)) {
+                    if (strcmp(method, "password") == 0) {
+                        password_allowed = true;
+                        break;
+                    }
+                }
+
+                session->auth_password_attempts++;
+                if (password_allowed && session->auth_password_attempts < 3) {
+                    ssh_set_error(SSH_REQUEST_DENIED,
+                                  "authentication failed; try again\n");
+                    SAFE_FREE(methods);
+                    return SSH_AGAIN;
+                }
+
+                ssh_set_error(
+                    SSH_REQUEST_DENIED,
+                    partial_success
+                        ? "password authentication partially succeeded, but "
+                          "no supported method remains"
+                        : "password authentication failed");
+                SAFE_FREE(methods);
+                goto error;
+            }
 
             default:
-                // LAB: insert your code here.
-
+                ssh_set_error(SSH_REQUEST_DENIED,
+                              "unexpected authentication message %u", type);
+                goto error;
         }
     }
 

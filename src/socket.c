@@ -96,21 +96,49 @@ int ssh_socket_connect(ssh_socket s, const char *host, uint16_t port,
 void ssh_socket_set_fd(ssh_socket s, int fd) { s->fd = fd; }
 
 int ssh_socket_write(ssh_socket s, const void *buffer, size_t len) {
-    return write(s->fd, buffer, len);
+    const uint8_t *data = buffer;
+    size_t written = 0;
+
+    while (written < len) {
+        ssize_t rc = write(s->fd, data + written, len - written);
+
+        if (rc < 0) {
+            if (errno == EINTR) continue;
+            LOG_ERROR("write error on fd %d", s->fd);
+            ssh_set_error(SSH_FATAL, "socket %d write error: %s", s->fd,
+                          strerror(errno));
+            return SSH_ERROR;
+        }
+        if (rc == 0) {
+            ssh_set_error(SSH_FATAL, "connection closed by server");
+            return SSH_ERROR;
+        }
+        written += (size_t)rc;
+    }
+
+    return (int)written;
 }
 
 int ssh_socket_read(ssh_socket s, void *buffer, size_t len) {
-    int readn;
+    ssize_t readn;
 
     while (ssh_buffer_get_len(s->in_buffer) < len) {
         char tmp[256];
         readn = read(s->fd, tmp, sizeof(tmp));
         if (readn < 0) {
+            if (errno == EINTR) continue;
             LOG_ERROR("read error on fd %d", s->fd);
-            ssh_set_error(SSH_FATAL, "socket %d read error", s->fd);
+            ssh_set_error(SSH_FATAL, "socket %d read error: %s", s->fd,
+                          strerror(errno));
             return SSH_ERROR;
         }
-        ssh_buffer_add_data(s->in_buffer, tmp, readn);
+        if (readn == 0) {
+            LOG_ERROR("connection closed by server");
+            ssh_set_error(SSH_FATAL, "connection closed by server");
+            return SSH_ERROR;
+        }
+        if (ssh_buffer_add_data(s->in_buffer, tmp, (uint32_t)readn) != SSH_OK)
+            return SSH_ERROR;
     }
 
     ssh_buffer_get_data(s->in_buffer, buffer, len);

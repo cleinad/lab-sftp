@@ -18,6 +18,7 @@ struct ssh_channel_struct {
     ssh_session session; /* SSH_SESSION pointer */
     uint32_t local_channel;
     uint32_t local_window;
+    uint32_t local_consumed;
     int local_eof;
     uint32_t local_maxpacket;
 

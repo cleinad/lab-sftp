@@ -17,6 +17,7 @@
 
 int ssh_packet_send(ssh_session session);
 int ssh_packet_receive(ssh_session session);
+int ssh_packet_receive_message(ssh_session session);
 
 
 #endif /* PACKET_H */

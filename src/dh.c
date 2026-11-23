@@ -14,6 +14,7 @@
 #include "libsftp/bignum.h"
 #include "libsftp/buffer.h"
 #include "libsftp/crypto.h"
+#include "libsftp/error.h"
 #include "libsftp/logger.h"
 #include "libsftp/packet.h"
 #include "libsftp/pki.h"
@@ -39,9 +40,10 @@ struct dh_ctx {
 };
 
 static bignum ssh_dh_generator;
-static bignum ssh_dh_group14;
+static bignum ssh_dh_group1;
 
-static unsigned char p_group14_value[] = {
+/* Oakley group 2, used by diffie-hellman-group1-sha1. */
+static const unsigned char p_group1_value[] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC9, 0x0F, 0xDA, 0xA2,
     0x21, 0x68, 0xC2, 0x34, 0xC4, 0xC6, 0x62, 0x8B, 0x80, 0xDC, 0x1C, 0xD1,
     0x29, 0x02, 0x4E, 0x08, 0x8A, 0x67, 0xCC, 0x74, 0x02, 0x0B, 0xBE, 0xA6,
@@ -51,21 +53,13 @@ static unsigned char p_group14_value[] = {
     0xE4, 0x85, 0xB5, 0x76, 0x62, 0x5E, 0x7E, 0xC6, 0xF4, 0x4C, 0x42, 0xE9,
     0xA6, 0x37, 0xED, 0x6B, 0x0B, 0xFF, 0x5C, 0xB6, 0xF4, 0x06, 0xB7, 0xED,
     0xEE, 0x38, 0x6B, 0xFB, 0x5A, 0x89, 0x9F, 0xA5, 0xAE, 0x9F, 0x24, 0x11,
-    0x7C, 0x4B, 0x1F, 0xE6, 0x49, 0x28, 0x66, 0x51, 0xEC, 0xE4, 0x5B, 0x3D,
-    0xC2, 0x00, 0x7C, 0xB8, 0xA1, 0x63, 0xBF, 0x05, 0x98, 0xDA, 0x48, 0x36,
-    0x1C, 0x55, 0xD3, 0x9A, 0x69, 0x16, 0x3F, 0xA8, 0xFD, 0x24, 0xCF, 0x5F,
-    0x83, 0x65, 0x5D, 0x23, 0xDC, 0xA3, 0xAD, 0x96, 0x1C, 0x62, 0xF3, 0x56,
-    0x20, 0x85, 0x52, 0xBB, 0x9E, 0xD5, 0x29, 0x07, 0x70, 0x96, 0x96, 0x6D,
-    0x67, 0x0C, 0x35, 0x4E, 0x4A, 0xBC, 0x98, 0x04, 0xF1, 0x74, 0x6C, 0x08,
-    0xCA, 0x18, 0x21, 0x7C, 0x32, 0x90, 0x5E, 0x46, 0x2E, 0x36, 0xCE, 0x3B,
-    0xE3, 0x9E, 0x77, 0x2C, 0x18, 0x0E, 0x86, 0x03, 0x9B, 0x27, 0x83, 0xA2,
-    0xEC, 0x07, 0xA2, 0x8F, 0xB5, 0xC5, 0x5D, 0xF0, 0x6F, 0x4C, 0x52, 0xC9,
-    0xDE, 0x2B, 0xCB, 0xF6, 0x95, 0x58, 0x17, 0x18, 0x39, 0x95, 0x49, 0x7C,
-    0xEA, 0x95, 0x6A, 0xE5, 0x15, 0xD2, 0x26, 0x18, 0x98, 0xFA, 0x05, 0x10,
-    0x15, 0x72, 0x8E, 0x5A, 0x8A, 0xAC, 0xAA, 0x68, 0xFF, 0xFF, 0xFF, 0xFF,
+    0x7C, 0x4B, 0x1F, 0xE6, 0x49, 0x28, 0x66, 0x51, 0xEC, 0xE6, 0x53, 0x81,
+    0xFF, 0xFF, 0xFF, 0xFF,
     0xFF, 0xFF, 0xFF, 0xFF};
 
-#define P_GROUP14_LEN 256 /* Size in bytes of the p number for group 14 */
+#define P_GROUP1_LEN 128
+_Static_assert(sizeof(p_group1_value) == P_GROUP1_LEN,
+               "DH group1 modulus must be 1024 bits");
 
 static int dh_keypair_gen_keys(struct dh_ctx *ctx, int peer);
 static int dh_keypair_get_keys(struct dh_ctx *ctx, int peer, const_bignum *priv,
@@ -104,7 +98,6 @@ static void ssh_dh_debug_crypto(struct ssh_crypto_struct *c) {
 
 static int dh_init(ssh_session session) {
     struct ssh_crypto_struct *crypto = session->next_crypto;
-    const_bignum pubkey;
     struct dh_ctx *ctx = NULL;
     int rc;
 
@@ -112,14 +105,14 @@ static int dh_init(ssh_session session) {
     rc = bignum_set_word(ssh_dh_generator, 2);
     if (rc != 1) return SSH_ERROR;
 
-    bignum_bin2bn(p_group14_value, P_GROUP14_LEN, &ssh_dh_group14);
-    if (ssh_dh_group14 == NULL) return SSH_ERROR;
+    bignum_bin2bn(p_group1_value, P_GROUP1_LEN, &ssh_dh_group1);
+    if (ssh_dh_group1 == NULL) return SSH_ERROR;
 
     /* DH context initialization */
     ctx = calloc(1, sizeof(*ctx));
     if (ctx == NULL) return SSH_ERROR;
 
-    rc = dh_set_parameters(ctx, ssh_dh_group14, ssh_dh_generator);
+    rc = dh_set_parameters(ctx, ssh_dh_group1, ssh_dh_generator);
     crypto->dh_ctx = ctx;
     if (rc != SSH_OK) {
         dh_cleanup(crypto);
@@ -189,7 +182,7 @@ void dh_cleanup(struct ssh_crypto_struct *crypto) {
     crypto->dh_ctx = NULL;
 
     bignum_safe_free(ssh_dh_generator);
-    bignum_safe_free(ssh_dh_group14);
+    bignum_safe_free(ssh_dh_group1);
 }
 
 static int dh_keypair_gen_keys(struct dh_ctx *dh_ctx, int peer) {
@@ -284,7 +277,9 @@ static int dh_keypair_set_keys(struct dh_ctx *ctx, int peer, bignum priv,
 }
 
 static void dh_free_modulus(struct dh_ctx *ctx) {
-    bignum_safe_free(ctx->modulus);
+    if (ctx->modulus != ssh_dh_group1) {
+        bignum_safe_free(ctx->modulus);
+    }
     ctx->modulus = NULL;
 }
 
@@ -389,24 +384,26 @@ static int dh_compute_session_id(ssh_session session) {
                          session->next_crypto->shared_secret);
     if (rc != SSH_OK) goto error;
 
-    if (session->next_crypto->kex_type != SSH_KEX_DH_GROUP14_SHA256) goto error;
-    session->next_crypto->digest_len = SHA256_DIGEST_LENGTH;
-    session->next_crypto->digest_type = SSH_KDF_SHA256;
+    if (session->next_crypto->kex_type != SSH_KEX_DH_GROUP1_SHA1) goto error;
+    session->next_crypto->digest_len = SHA_DIGEST_LENGTH;
+    session->next_crypto->digest_type = SSH_KDF_SHA1;
     session->next_crypto->secret_hash =
         malloc(session->next_crypto->digest_len);
     if (session->next_crypto->secret_hash == NULL) goto error;
-    sha256(ssh_buffer_get(buf), ssh_buffer_get_len(buf),
-           session->next_crypto->secret_hash);
+    sha1(ssh_buffer_get(buf), ssh_buffer_get_len(buf),
+         session->next_crypto->secret_hash);
 
     if (session->next_crypto->session_id == NULL) {
         session->next_crypto->session_id_len = session->next_crypto->digest_len;
         session->next_crypto->session_id =
             malloc(session->next_crypto->session_id_len);
+        if (session->next_crypto->session_id == NULL) goto error;
         memcpy(session->next_crypto->session_id,
                session->next_crypto->secret_hash,
                session->next_crypto->session_id_len);
     }
 
+    ssh_buffer_free(buf);
     return SSH_OK;
 error:
     ssh_buffer_free(buf);
@@ -445,7 +442,10 @@ static int dh_gen_session_keys(ssh_session session) {
     key = (unsigned char *)k_string;
     key_len = ssh_string_len(k_string) + 4;
 
-    IV_len = crypto->digest_len;
+    if (crypto->out_cipher->blocksize != crypto->in_cipher->blocksize) {
+        goto error;
+    }
+    IV_len = crypto->out_cipher->blocksize;
 
     enckey_cli_to_srv_len = crypto->out_cipher->keysize / 8;
     enckey_srv_to_cli_len = crypto->in_cipher->keysize / 8;
@@ -495,6 +495,9 @@ static int dh_gen_session_keys(ssh_session session) {
     if (rc < 0) {
         goto error;
     }
+
+    ssh_string_free(k_string);
+    k_string = NULL;
 
     crypto->encryptIV = IV_cli_to_srv;
     crypto->decryptIV = IV_srv_to_cli;
@@ -574,20 +577,44 @@ static int dh_send_init(ssh_session session) {
  */
 static int dh_receive_reply(ssh_session session) {
     struct ssh_crypto_struct *crypto = session->next_crypto;
-    bignum server_pubkey;
+    bignum server_pubkey = NULL;
+    bignum one = NULL;
+    bignum p_minus_one = NULL;
     uint8_t type;
     int rc;
 
-    rc = ssh_packet_receive(session);
+    rc = ssh_packet_receive_message(session);
     if (rc != SSH_OK) return rc;
 
-    ssh_buffer_get_u8(session->in_buffer, &type);
+    if (ssh_buffer_get_u8(session->in_buffer, &type) != 1) return SSH_ERROR;
     if (type != SSH_MSG_KEXDH_REPLY) return SSH_ERROR;
 
     rc = ssh_buffer_unpack(session->in_buffer, "SBS",
                            &crypto->server_pubkey_blob, &server_pubkey,
                            &crypto->dh_server_signature);
     if (rc != SSH_OK) return rc;
+
+    one = bignum_new();
+    p_minus_one = bignum_new();
+    if (one == NULL || p_minus_one == NULL ||
+        bignum_set_word(one, 1) != 1 ||
+        bignum_sub(p_minus_one, crypto->dh_ctx->modulus, one) != 1) {
+        bignum_safe_free(one);
+        bignum_safe_free(p_minus_one);
+        bignum_safe_free(server_pubkey);
+        return SSH_ERROR;
+    }
+    if (bignum_cmp(server_pubkey, one) <= 0 ||
+        bignum_cmp(server_pubkey, p_minus_one) >= 0) {
+        ssh_set_error(SSH_FATAL, "invalid server Diffie-Hellman public value");
+        LOG_ERROR("invalid server Diffie-Hellman public value");
+        bignum_safe_free(one);
+        bignum_safe_free(p_minus_one);
+        bignum_safe_free(server_pubkey);
+        return SSH_ERROR;
+    }
+    bignum_safe_free(one);
+    bignum_safe_free(p_minus_one);
 
     rc = dh_keypair_set_keys(crypto->dh_ctx, DH_SERVER_KEYPAIR, NULL,
                              server_pubkey);
@@ -597,9 +624,12 @@ static int dh_receive_reply(ssh_session session) {
     }
 
     /* Skip: check server public key */
-    /* Waht should we do next? */
-    // LAB: insert your code here.
+    rc = dh_compute_shared_secret(crypto->dh_ctx, DH_CLIENT_KEYPAIR,
+                                  DH_SERVER_KEYPAIR, &crypto->shared_secret);
+    if (rc != SSH_OK) return rc;
 
+    rc = dh_compute_session_id(session);
+    if (rc != SSH_OK) return rc;
 
     /* Skip: verifies signature on H (session id) */
 
@@ -612,6 +642,10 @@ static int dh_receive_reply(ssh_session session) {
     rc = ssh_buffer_add_u8(session->out_buffer, SSH_MSG_NEWKEYS);
     rc |= ssh_packet_send(session);
     if (rc != SSH_OK) return rc;
+
+    /* Outgoing packets switch immediately after our NEWKEYS is sent. */
+    session->current_crypto = crypto;
+    crypto->used |= SSH_DIRECTION_OUT;
 
     return SSH_OK;
 }
@@ -628,15 +662,15 @@ static int dh_set_new_keys(ssh_session session) {
     uint8_t type;
     int rc;
 
-    rc = ssh_packet_receive(session);
+    rc = ssh_packet_receive_message(session);
     if (rc != SSH_OK) return rc;
 
-    ssh_buffer_get_u8(session->in_buffer, &type);
+    if (ssh_buffer_get_u8(session->in_buffer, &type) != 1) return SSH_ERROR;
     if (type != SSH_MSG_NEWKEYS) return SSH_ERROR;
 
     /* NEWKEYS received, now its time to activate encryption */
-    // LAB: insert your code here.
-
+    session->current_crypto = crypto;
+    crypto->used |= SSH_DIRECTION_IN;
 
     /* next_crypto should be deprecated from now if re-kex is not supportes */
     session->next_crypto = NULL;

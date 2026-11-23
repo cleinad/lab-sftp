@@ -30,6 +30,7 @@ struct ssh_session_struct {
     int client;
     uint32_t send_seq;
     uint32_t recv_seq;
+    unsigned int auth_password_attempts;
 
     ssh_string banner; /* that's the issue banner from
                        the server */

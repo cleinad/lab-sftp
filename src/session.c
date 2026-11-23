@@ -28,7 +28,6 @@
 
 ssh_session ssh_new(void) {
     ssh_session session;
-    int rc;
 
     session = calloc(1, sizeof(struct ssh_session_struct));
     if (session == NULL) {
@@ -72,12 +71,28 @@ void ssh_free(ssh_session session) {
     if (session == NULL) return;
 
     ssh_socket_free(session->socket);
-    session->socket = NULL;
+    SAFE_FREE(session->socket);
 
     ssh_buffer_free(session->in_buffer);
     ssh_buffer_free(session->out_buffer);
+    ssh_buffer_free(session->in_hashbuf);
+    ssh_buffer_free(session->out_hashbuf);
 
+    if (session->current_crypto == session->next_crypto) {
+        session->next_crypto = NULL;
+    }
+    crypto_free(session->current_crypto);
     crypto_free(session->next_crypto);
+
+    SAFE_FREE(session->server_id_str);
+    SAFE_FREE(session->client_id_str);
+    SAFE_FREE(session->opts.username);
+    SAFE_FREE(session->opts.host);
+    SAFE_FREE(session->opts.sshdir);
+    SAFE_FREE(session->opts.knownhosts);
+    SAFE_FREE(session->opts.pubkey_accepted_types);
+    SAFE_FREE(session->opts.custombanner);
+    SAFE_FREE(session);
 }
 
 int ssh_options_set(ssh_session session, enum ssh_options_e type,
@@ -167,11 +182,15 @@ int send_id_str(ssh_session session) {
     int rc = SSH_ERROR;
 
     session->client_id_str = strdup(id_str);
+    if (session->client_id_str == NULL) {
+        return SSH_ERROR;
+    }
     snprintf(buffer, sizeof(buffer), "%s%s", session->client_id_str,
              terminator);
 
-    rc = ssh_socket_write(session->socket, buffer, strlen(buffer));
-    return rc;
+    len = strlen(buffer);
+    rc = ssh_socket_write(session->socket, buffer, len);
+    return rc == (int)len ? SSH_OK : SSH_ERROR;
 }
 
 /**
@@ -182,7 +201,8 @@ int send_id_str(ssh_session session) {
  */
 int receive_id_str(ssh_session session) {
     char buffer[256] = {0};
-    char *ptr = buffer;
+    size_t len = 0;
+    unsigned int preamble_lines = 0;
 
     /**
      * The server MAY send other lines of data before sending the version 
@@ -193,14 +213,52 @@ int receive_id_str(ssh_session session) {
      * ignored, or MAY be displayed to the client user.
      */
 
-    /* according to RFC 4253 the max banner length is 255 */
-    for (int i = 0; i < 256; ++i) {
-        ssh_socket_read(session->socket, &buffer[i], 1);
-        // LAB: insert your code here.
+    /* Read complete lines until the SSH identification line is found. */
+    for (;;) {
+        char c;
 
+        if (ssh_socket_read(session->socket, &c, 1) != SSH_OK) {
+            return SSH_ERROR;
+        }
+
+        if (c != '\n') {
+            if (len >= sizeof(buffer) - 1) {
+                LOG_ERROR("server identification line is too long");
+                return SSH_ERROR;
+            }
+            buffer[len++] = c;
+            continue;
+        }
+
+        if (len > 0 && buffer[len - 1] == '\r') {
+            len--;
+        }
+        buffer[len] = '\0';
+
+        if ((len >= 8 && memcmp(buffer, "SSH-2.0-", 8) == 0) ||
+            (len >= 9 && memcmp(buffer, "SSH-1.99-", 9) == 0)) {
+            session->server_id_str = strdup(buffer);
+            if (session->server_id_str == NULL) {
+                return SSH_ERROR;
+            }
+            LOG_INFO("server identification: %s", session->server_id_str);
+            return SSH_OK;
+        }
+
+        if (len >= 4 && memcmp(buffer, "SSH-", 4) == 0) {
+            ssh_set_error(SSH_FATAL, "unsupported server identification: %s",
+                          buffer);
+            return SSH_ERROR;
+        }
+        if (++preamble_lines > 50) {
+            ssh_set_error(SSH_FATAL,
+                          "too many lines before server identification");
+            return SSH_ERROR;
+        }
+
+        len = 0;
+        buffer[0] = '\0';
     }
-    /* this line should not be reached */
-    return SSH_ERROR;
 }
 
 /**
