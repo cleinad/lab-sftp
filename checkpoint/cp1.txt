@@ -1,6 +1,6 @@
 # CP1: server identification string
 Client log (session 1):
-10:16:58:102346     [INFO] receive_id_str (session.c:244) - server identification: SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
+09:06:15:336896     [INFO] receive_id_str (session.c:244) - server identification: SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
 
 Server side, the client's own identification as seen by sshd:
 debug1: Remote protocol version 2.0, remote software version minissh_0.1.0

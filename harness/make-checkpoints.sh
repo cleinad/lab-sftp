@@ -43,7 +43,7 @@ cp "$O/session.pcap" "$C/cp3-session.pcap"
   echo "Client transcript:"; echo "$CL" | grep -E 'uploaded|downloaded|^exit='
   echo; echo "SHA-256 (local original, server copy, downloaded copy):"
   docker run --rm -v "$O":/o -v "$REPO":/r lab4-build sh -c 'sha256sum /r/client.c /o/remote.bin /o/downloaded.bin'
-  echo; echo "Harness result:"; cat /tmp/lab4-check.txt
+  echo; echo "Harness result:"; grep -v '^logs: ' /tmp/lab4-check.txt
 } > "$C/cp6.txt"
 strip < "$O/client.log" > "$C/client.log"; cp "$O/sshd.log" "$C/sshd.log"
 echo "checkpoint/ written: $(ls "$C" | tr '\n' ' ')"

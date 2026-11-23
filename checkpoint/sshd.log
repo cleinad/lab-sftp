@@ -10,16 +10,16 @@ Server listening on :: port 22.
 debug3: fd 5 is not O_NONBLOCK
 debug1: Forked child 7.
 debug3: send_rexec_state: entering fd = 8 config len 3518
+debug3: oom_adjust_restore
 debug3: ssh_msg_send: type 0
 debug3: send_rexec_state: done
-debug3: oom_adjust_restore
 debug1: Set /proc/self/oom_score_adj to 0
 debug1: rexec start in 5 out 5 newsock 5 pipe 7 sock 8
 debug3: already daemonized
 debug1: inetd sockets after dupping: 4, 4
 debug3: process_channel_timeouts: setting 0 timeouts
 debug3: channel_clear_timeouts: clearing
-Connection from 172.21.0.3 port 40996 on 172.21.0.2 port 22 rdomain ""
+Connection from 172.21.0.3 port 41152 on 172.21.0.2 port 22 rdomain ""
 debug1: Local version string SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
 debug1: Remote protocol version 2.0, remote software version minissh_0.1.0
 debug1: compat_banner: no match: minissh_0.1.0
@@ -69,19 +69,19 @@ debug1: kex: server->client cipher: aes256-cbc MAC: hmac-sha1 compression: none 
 debug1: expecting SSH2_MSG_KEX_ECDH_INIT [preauth]
 debug3: receive packet: type 30 [preauth]
 debug1: SSH2_MSG_KEX_ECDH_INIT received [preauth]
-debug2: bits set: 535/1024 [preauth]
-debug2: bits set: 497/1024 [preauth]
+debug2: bits set: 499/1024 [preauth]
+debug2: bits set: 515/1024 [preauth]
 debug3: mm_sshkey_sign: entering [preauth]
 debug3: mm_request_send: entering, type 6 [preauth]
 debug3: mm_sshkey_sign: waiting for MONITOR_ANS_SIGN [preauth]
-debug3: mm_request_receive_expect: entering, type 7 [preauth]
-debug3: mm_request_receive: entering [preauth]
 debug3: mm_request_receive: entering
 debug3: monitor_read: checking request 6
 debug3: mm_answer_sign: entering
 debug3: mm_answer_sign: ssh-rsa KEX signature len=399
 debug3: mm_request_send: entering, type 7
 debug2: monitor_read: 6 used once, disabling now
+debug3: mm_request_receive_expect: entering, type 7 [preauth]
+debug3: mm_request_receive: entering [preauth]
 debug3: send packet: type 31 [preauth]
 debug3: send packet: type 21 [preauth]
 debug2: ssh_set_newkeys: mode 1 [preauth]
@@ -118,18 +118,18 @@ debug3: mm_start_pam entering [preauth]
 debug3: mm_request_send: entering, type 100 [preauth]
 debug3: mm_inform_authserv: entering [preauth]
 debug3: mm_request_send: entering, type 4 [preauth]
-debug2: input_userauth_request: try method password [preauth]
-debug3: mm_auth_password: entering [preauth]
-debug3: mm_request_send: entering, type 12 [preauth]
-debug3: mm_auth_password: waiting for MONITOR_ANS_AUTHPASSWORD [preauth]
-debug3: mm_request_receive_expect: entering, type 13 [preauth]
-debug3: mm_request_receive: entering [preauth]
 debug3: mm_request_receive: entering
 debug3: monitor_read: checking request 100
 debug1: PAM: initializing for "tester"
 debug1: PAM: setting PAM_RHOST to "172.21.0.3"
 debug1: PAM: setting PAM_TTY to "ssh"
 debug2: monitor_read: 100 used once, disabling now
+debug2: input_userauth_request: try method password [preauth]
+debug3: mm_auth_password: entering [preauth]
+debug3: mm_request_send: entering, type 12 [preauth]
+debug3: mm_auth_password: waiting for MONITOR_ANS_AUTHPASSWORD [preauth]
+debug3: mm_request_receive_expect: entering, type 13 [preauth]
+debug3: mm_request_receive: entering [preauth]
 debug3: mm_request_receive: entering
 debug3: monitor_read: checking request 4
 debug3: mm_answer_authserv: service=ssh-connection, style=, role=
@@ -147,7 +147,7 @@ debug1: do_pam_account: called
 debug2: do_pam_account: auth information in SSH_AUTH_INFO_0
 debug3: PAM: do_pam_account pam_acct_mgmt = 0 (Success)
 debug3: mm_request_send: entering, type 103
-Accepted password for tester from 172.21.0.3 port 40996 ssh2
+Accepted password for tester from 172.21.0.3 port 41152 ssh2
 debug1: monitor_child_preauth: user tester authenticated by privileged process
 debug3: mm_get_keystate: Waiting for new keys
 debug3: mm_request_receive_expect: entering, type 26
@@ -155,7 +155,7 @@ debug3: mm_request_receive: entering
 debug3: mm_get_keystate: GOT new keys
 debug3: mm_auth_password: user authenticated [preauth]
 debug3: user_specific_delay: user specific delay 0.000ms [preauth]
-debug3: ensure_minimum_time_since: elapsed 29.764ms, delaying 3.848ms (requested 8.403ms) [preauth]
+debug3: ensure_minimum_time_since: elapsed 29.105ms, delaying 4.508ms (requested 8.403ms) [preauth]
 debug3: mm_do_pam_account entering [preauth]
 debug3: mm_request_send: entering, type 102 [preauth]
 debug3: mm_request_receive_expect: entering, type 103 [preauth]
@@ -208,7 +208,7 @@ debug1: session_input_channel_req: session 0 req subsystem
 debug2: subsystem request for sftp by user tester
 debug1: subsystem: exec() /usr/lib/openssh/sftp-server 
 debug2: channel_set_xtype: labeled channel 0 as session:subsystem:sftp (inactive timeout 0)
-Starting session: subsystem 'sftp' for tester from 172.21.0.3 port 40996 id 0
+Starting session: subsystem 'sftp' for tester from 172.21.0.3 port 41152 id 0
 debug3: mm_audit_run_command entering command /usr/lib/openssh/sftp-server 
 debug3: mm_request_send: entering, type 113
 debug3: mm_request_receive: entering
@@ -254,7 +254,7 @@ debug2: channel 0: is dead
 debug2: channel 0: gc: notify user
 debug1: session_by_channel: session 0 channel 0
 debug1: session_close_by_channel: channel 0 child 0
-Close session: user tester from 172.21.0.3 port 40996 id 0
+Close session: user tester from 172.21.0.3 port 41152 id 0
 debug3: session_unused: session id 0 unused
 debug2: channel 0: gc: user detached
 debug2: channel 0: is dead
@@ -263,13 +263,13 @@ debug1: channel 0: free: server-session, nchannels 1
 debug3: channel 0: status: The following connections are open:
   #0 server-session (t4 [session:subsystem:sftp] r1 i3/0 o3/0 e[closed]/0 fd -1/-1/-1 sock -1 cc -1 io 0x00/0x00)
 
-Connection closed by 172.21.0.3 port 40996
+Connection closed by 172.21.0.3 port 41152
 debug1: do_cleanup
 debug3: PAM: sshpam_thread_cleanup entering
 debug1: temporarily_use_uid: 1001/1001 (e=1001/1001)
 debug1: restore_uid: (unprivileged)
 Transferred: sent 3480, received 6744 bytes
-Closing connection to 172.21.0.3 port 40996
+Closing connection to 172.21.0.3 port 41152
 debug3: mm_audit_event entering
 debug3: mm_request_send: entering, type 112
 debug3: mm_request_receive: entering
@@ -286,15 +286,15 @@ debug3: fd 5 is not O_NONBLOCK
 debug1: Forked child 20.
 debug3: send_rexec_state: entering fd = 8 config len 3518
 debug3: ssh_msg_send: type 0
-debug3: oom_adjust_restore
 debug3: send_rexec_state: done
+debug3: oom_adjust_restore
 debug1: Set /proc/self/oom_score_adj to 0
 debug1: rexec start in 5 out 5 newsock 5 pipe 7 sock 8
 debug3: already daemonized
 debug1: inetd sockets after dupping: 4, 4
 debug3: process_channel_timeouts: setting 0 timeouts
 debug3: channel_clear_timeouts: clearing
-Connection from 172.21.0.3 port 41012 on 172.21.0.2 port 22 rdomain ""
+Connection from 172.21.0.3 port 41156 on 172.21.0.2 port 22 rdomain ""
 debug1: Local version string SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
 debug1: Remote protocol version 2.0, remote software version minissh_0.1.0
 debug1: compat_banner: no match: minissh_0.1.0
@@ -344,8 +344,8 @@ debug1: kex: server->client cipher: aes256-cbc MAC: hmac-sha1 compression: none 
 debug1: expecting SSH2_MSG_KEX_ECDH_INIT [preauth]
 debug3: receive packet: type 30 [preauth]
 debug1: SSH2_MSG_KEX_ECDH_INIT received [preauth]
-debug2: bits set: 533/1024 [preauth]
-debug2: bits set: 487/1024 [preauth]
+debug2: bits set: 518/1024 [preauth]
+debug2: bits set: 519/1024 [preauth]
 debug3: mm_sshkey_sign: entering [preauth]
 debug3: mm_request_send: entering, type 6 [preauth]
 debug3: mm_sshkey_sign: waiting for MONITOR_ANS_SIGN [preauth]
@@ -422,7 +422,7 @@ debug1: do_pam_account: called
 debug2: do_pam_account: auth information in SSH_AUTH_INFO_0
 debug3: PAM: do_pam_account pam_acct_mgmt = 0 (Success)
 debug3: mm_request_send: entering, type 103
-Accepted password for tester from 172.21.0.3 port 41012 ssh2
+Accepted password for tester from 172.21.0.3 port 41156 ssh2
 debug1: monitor_child_preauth: user tester authenticated by privileged process
 debug3: mm_get_keystate: Waiting for new keys
 debug3: mm_request_receive_expect: entering, type 26
@@ -430,7 +430,7 @@ debug3: mm_request_receive: entering
 debug3: mm_get_keystate: GOT new keys
 debug3: mm_auth_password: user authenticated [preauth]
 debug3: user_specific_delay: user specific delay 0.000ms [preauth]
-debug3: ensure_minimum_time_since: elapsed 31.384ms, delaying 2.228ms (requested 8.403ms) [preauth]
+debug3: ensure_minimum_time_since: elapsed 21.432ms, delaying 12.180ms (requested 8.403ms) [preauth]
 debug3: mm_do_pam_account entering [preauth]
 debug3: mm_request_send: entering, type 102 [preauth]
 debug3: mm_request_receive_expect: entering, type 103 [preauth]
@@ -482,7 +482,7 @@ debug1: session_input_channel_req: session 0 req subsystem
 debug2: subsystem request for sftp by user tester
 debug1: subsystem: exec() /usr/lib/openssh/sftp-server 
 debug2: channel_set_xtype: labeled channel 0 as session:subsystem:sftp (inactive timeout 0)
-Starting session: subsystem 'sftp' for tester from 172.21.0.3 port 41012 id 0
+Starting session: subsystem 'sftp' for tester from 172.21.0.3 port 41156 id 0
 debug3: mm_audit_run_command entering command /usr/lib/openssh/sftp-server 
 debug3: mm_request_send: entering, type 113
 debug3: mm_request_receive: entering
@@ -528,7 +528,7 @@ debug2: channel 0: is dead
 debug2: channel 0: gc: notify user
 debug1: session_by_channel: session 0 channel 0
 debug1: session_close_by_channel: channel 0 child 0
-Close session: user tester from 172.21.0.3 port 41012 id 0
+Close session: user tester from 172.21.0.3 port 41156 id 0
 debug3: session_unused: session id 0 unused
 debug2: channel 0: gc: user detached
 debug2: channel 0: is dead
@@ -537,19 +537,19 @@ debug1: channel 0: free: server-session, nchannels 1
 debug3: channel 0: status: The following connections are open:
   #0 server-session (t4 [session:subsystem:sftp] r1 i3/0 o3/0 e[closed]/0 fd -1/-1/-1 sock -1 cc -1 io 0x00/0x00)
 
-Connection closed by 172.21.0.3 port 41012
+Connection closed by 172.21.0.3 port 41156
 debug1: do_cleanup
 debug3: PAM: sshpam_thread_cleanup entering
 debug1: temporarily_use_uid: 1001/1001 (e=1001/1001)
 debug1: restore_uid: (unprivileged)
 Transferred: sent 9544, received 776 bytes
-Closing connection to 172.21.0.3 port 41012
+Closing connection to 172.21.0.3 port 41156
 debug3: mm_audit_event entering
 debug3: mm_request_send: entering, type 112
-debug3: mm_request_send: entering, type 50
 debug3: mm_request_receive: entering
 debug3: monitor_read: checking request 112
 debug3: mm_answer_audit_event entering
+debug3: mm_request_send: entering, type 50
 debug3: mm_request_receive: entering
 debug3: monitor_read: checking request 50
 debug3: mm_answer_term: tearing down sessions

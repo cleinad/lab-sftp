@@ -20,5 +20,4 @@ CP4  PASS  password auth
 CP5  PASS  session channel + sftp subsystem
 CP6a PASS  upload matches
 CP6b PASS  download matches
-logs: /Users/danielchen/Documents/code/projects/lab-sftp/harness/out
 ALL_PASS

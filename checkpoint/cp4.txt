@@ -1,6 +1,6 @@
 # CP4: authentication success
 Client log:
-10:16:58:233455     [INFO] ssh_userauth_password (auth.c:144) - authentication succeeded (SSH_MSG_USERAUTH_SUCCESS)
+09:06:15:463164     [INFO] ssh_userauth_password (auth.c:144) - authentication succeeded (SSH_MSG_USERAUTH_SUCCESS)
 
 Server log:
-Accepted password for tester from 172.21.0.3 port 40996 ssh2
+Accepted password for tester from 172.21.0.3 port 41152 ssh2

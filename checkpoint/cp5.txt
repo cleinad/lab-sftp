@@ -1,8 +1,8 @@
 # CP5: channel opened
 Client log:
-10:16:58:286446     [INFO] channel_open (channel.c:220) - local channel id 1, window 64000
-10:16:58:286749     [INFO] channel_open (channel.c:222) - remote channel id 0, window 0
-10:16:58:288362   [NOTICE] channel_add_remote_window (channel.c:51) - remote window adjust to 2097152
+09:06:15:511707     [INFO] channel_open (channel.c:220) - local channel id 1, window 64000
+09:06:15:512046     [INFO] channel_open (channel.c:222) - remote channel id 0, window 0
+09:06:15:513572   [NOTICE] channel_add_remote_window (channel.c:51) - remote window adjust to 2097152
 
 Server log:
 debug1: server_input_channel_open: ctype session rchan 1 win 64000 max 32768

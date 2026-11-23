@@ -1,97 +1,97 @@
-10:16:58:95870    [DEBUG] ssh_connect (session.c:292) - connected to server by fd 3
-10:16:58:98395    [DEBUG] ssh_connect (session.c:302) - client id sent
-10:16:58:102346     [INFO] receive_id_str (session.c:244) - server identification: SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
-10:16:58:107346    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=20, len=148, padding_size=6,payload=141]
-10:16:58:108938    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=20, len=1172, padding_size=6,payload=1165]
-10:16:58:109556     [INFO] ssh_select_kex (kex.c:285) - negotiated algorithms: KEX=diffie-hellman-group1-sha1 host-key=ssh-rsa; client->server cipher=aes256-cbc MAC=hmac-sha1 compression=none; server->client cipher=aes256-cbc MAC=hmac-sha1 compression=none
-10:16:58:109958   [NOTICE] ssh_connect (session.c:342) - kex negotiation succeed
-10:16:58:110771    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=30, len=140, padding_size=6,payload=133]
-10:16:58:152703    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=31, len=956, padding_size=7,payload=948]
-10:16:58:153812    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=21, len=12, padding_size=10,payload=1]
-10:16:58:154170    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=21, len=12, padding_size=10,payload=1]
-10:16:58:154513    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=5, len=28, padding_size=10,payload=17]
-10:16:58:195145    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=6, len=28, padding_size=10,payload=17]
-password: 10:16:58:196487    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=50, len=60, padding_size=5,payload=54]
-10:16:58:232723    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=52, len=12, padding_size=10,payload=1]
-10:16:58:233455     [INFO] ssh_userauth_password (auth.c:144) - authentication succeeded (SSH_MSG_USERAUTH_SUCCESS)
-10:16:58:234093    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=90, len=44, padding_size=19,payload=24]
-10:16:58:244092    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=80, len=620, padding_size=16,payload=603]
-10:16:58:244573   [NOTICE] channel_handle_global_request (channel.c:66) - rejecting global request hostkeys-00@openssh.com
-10:16:58:286143    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=91, len=28, padding_size=10,payload=17]
-10:16:58:286446     [INFO] channel_open (channel.c:220) - local channel id 1, window 64000
-10:16:58:286749     [INFO] channel_open (channel.c:222) - remote channel id 0, window 0
-10:16:58:287086    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=98, len=44, padding_size=16,payload=27]
-10:16:58:287840    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=93, len=28, padding_size=18,payload=9]
-10:16:58:288362   [NOTICE] channel_add_remote_window (channel.c:51) - remote window adjust to 2097152
-10:16:58:288760    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=99, len=12, padding_size=6,payload=5]
-10:16:58:289090    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=28, padding_size=9,payload=18]
-10:16:58:289393    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=348, padding_size=16,payload=331]
-10:16:58:289655    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 317
-sftp> Enter filename: 10:16:58:290010    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=60, padding_size=17,payload=42]
-10:16:58:290321    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=17,payload=26]
-10:16:58:290577    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 12
-10:16:58:290913    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=6060, padding_size=18,payload=6041]
-10:16:58:291245    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=6,payload=37]
-10:16:58:291512    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 23
-10:16:58:291822    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=44, padding_size=17,payload=26]
-10:16:58:292116    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=6,payload=37]
-10:16:58:292367    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 23
+09:06:15:325090    [DEBUG] ssh_connect (session.c:292) - connected to server by fd 3
+09:06:15:326198    [DEBUG] ssh_connect (session.c:302) - client id sent
+09:06:15:336896     [INFO] receive_id_str (session.c:244) - server identification: SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
+09:06:15:340058    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=20, len=148, padding_size=6,payload=141]
+09:06:15:340937    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=20, len=1172, padding_size=6,payload=1165]
+09:06:15:341508     [INFO] ssh_select_kex (kex.c:285) - negotiated algorithms: KEX=diffie-hellman-group1-sha1 host-key=ssh-rsa; client->server cipher=aes256-cbc MAC=hmac-sha1 compression=none; server->client cipher=aes256-cbc MAC=hmac-sha1 compression=none
+09:06:15:341983   [NOTICE] ssh_connect (session.c:342) - kex negotiation succeed
+09:06:15:342652    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=30, len=140, padding_size=6,payload=133]
+09:06:15:384742    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=31, len=956, padding_size=7,payload=948]
+09:06:15:386120    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=21, len=12, padding_size=10,payload=1]
+09:06:15:386811    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=21, len=12, padding_size=10,payload=1]
+09:06:15:387319    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=5, len=28, padding_size=10,payload=17]
+09:06:15:426558    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=6, len=28, padding_size=10,payload=17]
+password: 09:06:15:427319    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=50, len=60, padding_size=5,payload=54]
+09:06:15:462385    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=52, len=12, padding_size=10,payload=1]
+09:06:15:463164     [INFO] ssh_userauth_password (auth.c:144) - authentication succeeded (SSH_MSG_USERAUTH_SUCCESS)
+09:06:15:463875    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=90, len=44, padding_size=19,payload=24]
+09:06:15:469906    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=80, len=620, padding_size=16,payload=603]
+09:06:15:470368   [NOTICE] channel_handle_global_request (channel.c:66) - rejecting global request hostkeys-00@openssh.com
+09:06:15:511371    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=91, len=28, padding_size=10,payload=17]
+09:06:15:511707     [INFO] channel_open (channel.c:220) - local channel id 1, window 64000
+09:06:15:512046     [INFO] channel_open (channel.c:222) - remote channel id 0, window 0
+09:06:15:512363    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=98, len=44, padding_size=16,payload=27]
+09:06:15:512953    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=93, len=28, padding_size=18,payload=9]
+09:06:15:513572   [NOTICE] channel_add_remote_window (channel.c:51) - remote window adjust to 2097152
+09:06:15:513821    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=99, len=12, padding_size=6,payload=5]
+09:06:15:514122    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=28, padding_size=9,payload=18]
+09:06:15:514688    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=348, padding_size=16,payload=331]
+09:06:15:514911    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 317
+sftp> Enter filename: 09:06:15:515272    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=60, padding_size=17,payload=42]
+09:06:15:515531    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=17,payload=26]
+09:06:15:515722    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 12
+09:06:15:515970    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=6060, padding_size=18,payload=6041]
+09:06:15:516230    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=6,payload=37]
+09:06:15:516467    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 23
+09:06:15:516710    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=44, padding_size=17,payload=26]
+09:06:15:516920    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=6,payload=37]
+09:06:15:517069    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 23
 client.c uploaded to the remote home directory
-sftp> 10:17:00:97640    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=96, len=12, padding_size=6,payload=5]
-10:17:00:99207    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=97, len=12, padding_size=6,payload=5]
-10:17:00:100279    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=96, len=12, padding_size=6,payload=5]
-10:17:00:100821    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=98, len=44, padding_size=18,payload=25]
-10:17:00:101395   [NOTICE] channel_reject_request (channel.c:118) - ignoring channel request exit-status
-10:17:00:101924    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=97, len=12, padding_size=6,payload=5]
+sftp> 09:06:17:324404    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=96, len=12, padding_size=6,payload=5]
+09:06:17:325151    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=97, len=12, padding_size=6,payload=5]
+09:06:17:325644    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=96, len=12, padding_size=6,payload=5]
+09:06:17:325955    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=98, len=44, padding_size=18,payload=25]
+09:06:17:326227   [NOTICE] channel_reject_request (channel.c:118) - ignoring channel request exit-status
+09:06:17:326541    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=97, len=12, padding_size=6,payload=5]
 Disconnect
 exit=0
-10:17:00:107972    [DEBUG] ssh_connect (session.c:292) - connected to server by fd 3
-10:17:00:108733    [DEBUG] ssh_connect (session.c:302) - client id sent
-10:17:00:114911     [INFO] receive_id_str (session.c:244) - server identification: SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
-10:17:00:117817    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=20, len=148, padding_size=6,payload=141]
-10:17:00:118656    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=20, len=1172, padding_size=6,payload=1165]
-10:17:00:119090     [INFO] ssh_select_kex (kex.c:285) - negotiated algorithms: KEX=diffie-hellman-group1-sha1 host-key=ssh-rsa; client->server cipher=aes256-cbc MAC=hmac-sha1 compression=none; server->client cipher=aes256-cbc MAC=hmac-sha1 compression=none
-10:17:00:119540   [NOTICE] ssh_connect (session.c:342) - kex negotiation succeed
-10:17:00:120217    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=30, len=140, padding_size=6,payload=133]
-10:17:00:164644    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=31, len=956, padding_size=7,payload=948]
-10:17:00:165780    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=21, len=12, padding_size=10,payload=1]
-10:17:00:166165    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=21, len=12, padding_size=10,payload=1]
-10:17:00:166515    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=5, len=28, padding_size=10,payload=17]
-10:17:00:207079    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=6, len=28, padding_size=10,payload=17]
-password: 10:17:00:208836    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=50, len=60, padding_size=5,payload=54]
-10:17:00:243742    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=52, len=12, padding_size=10,payload=1]
-10:17:00:244512     [INFO] ssh_userauth_password (auth.c:144) - authentication succeeded (SSH_MSG_USERAUTH_SUCCESS)
-10:17:00:245261    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=90, len=44, padding_size=19,payload=24]
-10:17:00:249310    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=80, len=620, padding_size=16,payload=603]
-10:17:00:249926   [NOTICE] channel_handle_global_request (channel.c:66) - rejecting global request hostkeys-00@openssh.com
-10:17:00:290771    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=91, len=28, padding_size=10,payload=17]
-10:17:00:291096     [INFO] channel_open (channel.c:220) - local channel id 1, window 64000
-10:17:00:291421     [INFO] channel_open (channel.c:222) - remote channel id 0, window 0
-10:17:00:291838    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=98, len=44, padding_size=16,payload=27]
-10:17:00:292396    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=93, len=28, padding_size=18,payload=9]
-10:17:00:293061   [NOTICE] channel_add_remote_window (channel.c:51) - remote window adjust to 2097152
-10:17:00:293431    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=99, len=12, padding_size=6,payload=5]
-10:17:00:293756    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=28, padding_size=9,payload=18]
-10:17:00:294035    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=348, padding_size=16,payload=331]
-10:17:00:294276    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 317
-sftp> Enter filename: 10:17:00:294592    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=60, padding_size=17,payload=42]
-10:17:00:294849    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=17,payload=26]
-10:17:00:295086    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 12
-10:17:00:295389    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=44, padding_size=5,payload=38]
-10:17:00:295687    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=6044, padding_size=18,payload=6025]
-10:17:00:295924    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 6011
-10:17:00:296185    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=44, padding_size=5,payload=38]
-10:17:00:296439    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=60, padding_size=18,payload=41]
-10:17:00:296718    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 27
-10:17:00:296990    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=44, padding_size=17,payload=26]
-10:17:00:297253    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=6,payload=37]
-10:17:00:297472    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 23
+09:06:17:330261    [DEBUG] ssh_connect (session.c:292) - connected to server by fd 3
+09:06:17:330776    [DEBUG] ssh_connect (session.c:302) - client id sent
+09:06:17:334554     [INFO] receive_id_str (session.c:244) - server identification: SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
+09:06:17:336052    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=20, len=148, padding_size=6,payload=141]
+09:06:17:336476    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=20, len=1172, padding_size=6,payload=1165]
+09:06:17:336690     [INFO] ssh_select_kex (kex.c:285) - negotiated algorithms: KEX=diffie-hellman-group1-sha1 host-key=ssh-rsa; client->server cipher=aes256-cbc MAC=hmac-sha1 compression=none; server->client cipher=aes256-cbc MAC=hmac-sha1 compression=none
+09:06:17:336893   [NOTICE] ssh_connect (session.c:342) - kex negotiation succeed
+09:06:17:337245    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=30, len=140, padding_size=6,payload=133]
+09:06:17:378938    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=31, len=956, padding_size=8,payload=947]
+09:06:17:379661    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=21, len=12, padding_size=10,payload=1]
+09:06:17:379995    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=21, len=12, padding_size=10,payload=1]
+09:06:17:380284    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=5, len=28, padding_size=10,payload=17]
+09:06:17:420468    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=6, len=28, padding_size=10,payload=17]
+password: 09:06:17:421136    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=50, len=60, padding_size=5,payload=54]
+09:06:17:455849    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=52, len=12, padding_size=10,payload=1]
+09:06:17:456467     [INFO] ssh_userauth_password (auth.c:144) - authentication succeeded (SSH_MSG_USERAUTH_SUCCESS)
+09:06:17:457033    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=90, len=44, padding_size=19,payload=24]
+09:06:17:460481    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=80, len=620, padding_size=16,payload=603]
+09:06:17:460802   [NOTICE] channel_handle_global_request (channel.c:66) - rejecting global request hostkeys-00@openssh.com
+09:06:17:501691    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=91, len=28, padding_size=10,payload=17]
+09:06:17:502044     [INFO] channel_open (channel.c:220) - local channel id 1, window 64000
+09:06:17:502342     [INFO] channel_open (channel.c:222) - remote channel id 0, window 0
+09:06:17:502710    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=98, len=44, padding_size=16,payload=27]
+09:06:17:503530    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=93, len=28, padding_size=18,payload=9]
+09:06:17:503996   [NOTICE] channel_add_remote_window (channel.c:51) - remote window adjust to 2097152
+09:06:17:504316    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=99, len=12, padding_size=6,payload=5]
+09:06:17:504594    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=28, padding_size=9,payload=18]
+09:06:17:504862    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=348, padding_size=16,payload=331]
+09:06:17:505074    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 317
+sftp> Enter filename: 09:06:17:505352    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=60, padding_size=17,payload=42]
+09:06:17:505640    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=17,payload=26]
+09:06:17:505852    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 12
+09:06:17:506152    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=44, padding_size=5,payload=38]
+09:06:17:506441    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=6044, padding_size=18,payload=6025]
+09:06:17:506666    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 6011
+09:06:17:506914    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=44, padding_size=5,payload=38]
+09:06:17:507145    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=60, padding_size=18,payload=41]
+09:06:17:507321    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 27
+09:06:17:507509    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=94, len=44, padding_size=17,payload=26]
+09:06:17:507720    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=94, len=44, padding_size=6,payload=37]
+09:06:17:507918    [DEBUG] sftp_packet_read (sftp.c:589) - sftp packet size: 23
 client.c downloaded to the current working direcrtory
-sftp> 10:17:02:108416    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=96, len=12, padding_size=6,payload=5]
-10:17:02:109010    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=97, len=12, padding_size=6,payload=5]
-10:17:02:109271    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=96, len=12, padding_size=6,payload=5]
-10:17:02:109557    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=98, len=44, padding_size=18,payload=25]
-10:17:02:109685   [NOTICE] channel_reject_request (channel.c:118) - ignoring channel request exit-status
-10:17:02:109811    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=97, len=12, padding_size=6,payload=5]
+sftp> 09:06:19:331009    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=96, len=12, padding_size=6,payload=5]
+09:06:19:332556    [DEBUG] ssh_packet_send (packet.c:453) - packet: wrote [type=97, len=12, padding_size=6,payload=5]
+09:06:19:333191    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=96, len=12, padding_size=6,payload=5]
+09:06:19:333642    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=98, len=44, padding_size=18,payload=25]
+09:06:19:333957   [NOTICE] channel_reject_request (channel.c:118) - ignoring channel request exit-status
+09:06:19:334340    [DEBUG] ssh_packet_receive (packet.c:321) - packet: received [type=97, len=12, padding_size=6,payload=5]
 Disconnect
 exit=0
